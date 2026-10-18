@@ -183,6 +183,122 @@ export function fillCategorical(rows, column, value) {
   return { rows: out, filled };
 }
 
+/** Validate a column rename: non-empty, unique. Returns { ok, error?, name? }. */
+export function validateRename(oldName, newName, colNames) {
+  const trimmed = String(newName ?? '').trim();
+  if (trimmed === '') {
+    return { ok: false, error: 'New column name cannot be empty.' };
+  }
+  if (trimmed === oldName) {
+    return { ok: false, error: `Column is already named "${oldName}".` };
+  }
+  const duplicate = (colNames || [])
+    .filter((n) => n !== oldName)
+    .some((n) => n.toLowerCase() === trimmed.toLowerCase());
+  if (duplicate) {
+    return { ok: false, error: `A column named "${trimmed}" already exists.` };
+  }
+  return { ok: true, name: trimmed };
+}
+
+/** Rename a column key in every row (original key order preserved). */
+export function renameColumn(rows, oldName, newName) {
+  if (oldName === newName) return { rows: rows.slice(), changed: 0 };
+  let changed = 0;
+  const out = rows.map((row) => {
+    if (!(oldName in row)) return row;
+    const next = {};
+    for (const [k, v] of Object.entries(row)) {
+      next[k === oldName ? newName : k] = v;
+    }
+    changed++;
+    return next;
+  });
+  return { rows: out, changed };
+}
+
+/**
+ * Validate a column removal: the column must exist and at least one other
+ * column must remain. Returns { ok, error? }.
+ */
+export function validateRemove(column, colNames) {
+  const names = colNames || [];
+  if (!names.includes(column)) {
+    return { ok: false, error: `Column "${column}" does not exist.` };
+  }
+  if (names.length < 2) {
+    return {
+      ok: false,
+      error: 'Cannot remove the only column in the dataset.',
+    };
+  }
+  return { ok: true };
+}
+
+/** Remove a column from every row. */
+export function removeColumn(rows, column) {
+  let removed = 0;
+  const out = rows.map((row) => {
+    if (!(column in row)) return row;
+    const next = { ...row };
+    delete next[column];
+    removed++;
+    return next;
+  });
+  return { rows: out, removed };
+}
+
+/** Validate fill-numeric preconditions: existing numeric column with at least
+ *  one non-missing numeric value to compute mean/median from. */
+export function validateFillNumeric(dataset, column, method = 'mean') {
+  const colNames = (dataset.columns || []).map((c) => c.name);
+  if (!colNames.includes(column)) {
+    return { ok: false, error: `Column "${column}" does not exist.` };
+  }
+  const type = dataset.columns.find((c) => c.name === column)?.type;
+  if (type !== 'numeric') {
+    return {
+      ok: false,
+      error: `Fill (${method}) needs a numeric column — "${column}" is ${type || 'unknown'}.`,
+    };
+  }
+  const nums = dataset.rows
+    .map((r) => r[column])
+    .map(toNumber)
+    .filter((v) => v !== null);
+  if (nums.length === 0) {
+    return {
+      ok: false,
+      error: `Column "${column}" has no non-missing numeric values to compute a ${method} from.`,
+    };
+  }
+  return { ok: true };
+}
+
+/** Validate fill-categorical preconditions: existing column + non-empty value. */
+export function validateFillCategorical(dataset, column, value) {
+  const colNames = (dataset.columns || []).map((c) => c.name);
+  if (!colNames.includes(column)) {
+    return { ok: false, error: `Column "${column}" does not exist.` };
+  }
+  if (String(value ?? '').trim() === '') {
+    return { ok: false, error: 'Enter a fill value.' };
+  }
+  return { ok: true, value: String(value).trim() };
+}
+
+/** Validate type-conversion preconditions: existing column + known target. */
+export function validateConvertType(dataset, column, target) {
+  const colNames = (dataset.columns || []).map((c) => c.name);
+  if (!colNames.includes(column)) {
+    return { ok: false, error: `Column "${column}" does not exist.` };
+  }
+  if (!['numeric', 'date', 'string'].includes(target)) {
+    return { ok: false, error: `Unknown target type "${target}".` };
+  }
+  return { ok: true };
+}
+
 /** Trim whitespace from all string values. */
 export function trimWhitespace(rows) {
   let changed = 0;
@@ -218,13 +334,14 @@ export function convertColumnType(rows, column, target) {
       }
       next = num;
     } else if (target === 'date') {
-      const s = String(v).trim();
-      const t = Date.parse(s);
-      if (Number.isNaN(t)) {
+      // Use the month-name-aware guard (isDateValue), not bare Date.parse:
+      // ID-like codes such as "ORD-0001" must NOT be converted into dates.
+      if (!isDateValue(v)) {
         failed++;
         return row;
       }
-      next = new Date(t).toISOString().slice(0, 10);
+      const s = String(v).trim();
+      next = new Date(Date.parse(s)).toISOString().slice(0, 10);
     } else if (target === 'string') {
       next = String(v);
     }

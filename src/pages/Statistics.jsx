@@ -2,7 +2,7 @@
  * Statistics.jsx — descriptive statistics, correlation, distribution,
  * confidence intervals and a one-sample t-test for DataPilot Analytics.
  */
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Sigma, FlaskConical, Info, Table2, ChartColumn, TrendingUp, Hash, GitCompareArrows } from 'lucide-react'
 import { useData } from '../context/DataContext'
 import ChartRenderer from '../components/ChartRenderer'
@@ -54,6 +54,57 @@ export default function Statistics() {
   const [selected, setSelected] = useState(null)
   const [mu0Text, setMu0Text] = useState(null)
 
+  /* ---- All hooks must run before any early return so the hook order is
+     identical on every render. These derivations are null-safe so the empty
+     states below still render correctly. ---- */
+  const col =
+    selected && numericCols.some((c) => c.name === selected)
+      ? selected
+      : numericCols.length > 0
+        ? numericCols[0].name
+        : null
+
+  const values = useMemo(
+    () => (dataset && col ? dataset.rows.map((r) => r[col]) : []),
+    [dataset, col],
+  )
+  const stats = useMemo(() => describeColumn(values), [values])
+
+  // Seed the hypothesized-mean input with the selected column's mean whenever
+  // the column (or dataset) changes; the input stays user-editable otherwise.
+  useEffect(() => {
+    if (dataset && col && stats.count > 0) {
+      setMu0Text(
+        stats.mean === null ? '' : String(Math.round(stats.mean * 100) / 100),
+      )
+    }
+  }, [dataset, col, stats.count, stats.mean])
+
+  // Memoized + null-safe so they run before the early returns below:
+  // inference on every keystroke/render would re-scan up to
+  // (rows × 8 columns) and block the UI on large datasets.
+  const ci = useMemo(
+    () => (values.length > 0 ? meanCI(values) : null),
+    [values],
+  )
+  const mu0 = useMemo(() => parseFloat(mu0Text), [mu0Text])
+  const test = useMemo(
+    () =>
+      values.length > 0
+        ? tTestOneSample(values, Number.isFinite(mu0) ? mu0 : NaN)
+        : null,
+    [values, mu0],
+  )
+  const corrCols = useMemo(
+    () => numericCols.slice(0, 8).map((c) => c.name),
+    [numericCols],
+  )
+  const corr = useMemo(
+    () =>
+      dataset && corrCols.length > 0 ? correlationMatrix(dataset.rows, corrCols) : null,
+    [dataset, corrCols],
+  )
+
   if (!dataset) {
     return (
       <EmptyState
@@ -74,16 +125,6 @@ export default function Statistics() {
     )
   }
 
-  const col = selected && numericCols.some((c) => c.name === selected)
-    ? selected
-    : numericCols[0].name
-
-  const values = useMemo(
-    () => dataset.rows.map((r) => r[col]),
-    [dataset, col],
-  )
-  const stats = useMemo(() => describeColumn(values), [values])
-
   if (stats.count === 0) {
     return (
       <EmptyState
@@ -94,17 +135,10 @@ export default function Statistics() {
     )
   }
 
-  if (mu0Text === null) {
-    setMu0Text(stats.mean === null ? '' : String(Math.round(stats.mean * 100) / 100))
-  }
-
-  const ci = meanCI(values)
+  // Below this point the early returns guarantee: dataset exists,
+  // at least one numeric column, and `values` is non-empty — so ci, test
+  // and corr (computed above) are all non-null here.
   const ciAssumptions = ci.method ? ci.method.split(';').map((s) => s.trim()).filter(Boolean) : []
-  const mu0 = parseFloat(mu0Text)
-  const test = tTestOneSample(values, Number.isFinite(mu0) ? mu0 : NaN)
-
-  const corrCols = numericCols.slice(0, 8).map((c) => c.name)
-  const corr = correlationMatrix(dataset.rows, corrCols)
 
   const statRows = [
     { label: 'Count', value: stats.count.toLocaleString('en-US'), def: 'Number of non-missing numeric values.' },

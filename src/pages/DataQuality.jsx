@@ -1,11 +1,20 @@
 /**
  * DataQuality.jsx — quality report + interactive cleaning operations.
  * Cleaning ops run the pure helpers from utils/cleaning.js with a preview
- * step; Apply requires window.confirm and calls updateDataset; Undo calls
- * resetDataset() to restore the original.
+ * step; nothing changes until the user explicitly confirms Apply.
+ * Every applied step is recorded in a transformation history; each step can
+ * be reverted (reverting a step also undoes the steps applied after it),
+ * and "Restore original" resets to the last-loaded dataset.
  */
-import { useMemo, useState } from 'react';
-import { BrushCleaning, Eye, RotateCcw, Undo2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  BrushCleaning,
+  Eye,
+  RotateCcw,
+  Undo2,
+  History,
+  AlertTriangle,
+} from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { isMissing } from '../utils/dataTypes';
 import {
@@ -15,6 +24,13 @@ import {
   fillCategorical,
   trimWhitespace,
   convertColumnType,
+  renameColumn,
+  removeColumn,
+  validateRename,
+  validateRemove,
+  validateFillNumeric,
+  validateFillCategorical,
+  validateConvertType,
 } from '../utils/cleaning';
 import DataQualityPanel from '../components/DataQualityPanel';
 import EmptyState from '../components/EmptyState';
@@ -26,63 +42,107 @@ const OPERATIONS = [
   { value: 'fill-categorical', label: 'Fill missing categorical values' },
   { value: 'trim-whitespace', label: 'Trim whitespace from text' },
   { value: 'convert-type', label: 'Convert column type' },
+  { value: 'rename-column', label: 'Rename a column' },
+  { value: 'remove-column', label: 'Remove a column' },
 ];
 
 const TARGET_TYPES = ['numeric', 'date', 'string'];
 
+/** Validate preconditions, then run the op. Throws Error on invalid input. */
 function runOperation(op, dataset, params) {
   const rows = dataset.rows;
+  const colNames = dataset.columns.map((c) => c.name);
+  const base = { afterColumns: colNames };
+
   switch (op) {
     case 'remove-duplicates': {
       const r = removeDuplicates(rows);
       return {
+        ...base,
         rows: r.rows,
         changed: r.removed,
         detail: `${r.removed.toLocaleString()} duplicate rows removed`,
       };
     }
     case 'drop-missing': {
-      const cols = params.dropColumns.length > 0 ? params.dropColumns : dataset.columns.map((c) => c.name);
+      const cols =
+        params.dropColumns.length > 0 ? params.dropColumns : colNames;
       const r = dropRowsWithMissing(rows, cols);
       return {
+        ...base,
         rows: r.rows,
         changed: r.removed,
         detail: `${r.removed.toLocaleString()} rows dropped (missing in: ${cols.join(', ')})`,
       };
     }
     case 'fill-numeric': {
+      const v = validateFillNumeric(dataset, params.column, params.method);
+      if (!v.ok) throw new Error(v.error);
       const r = fillNumeric(rows, params.column, params.method);
       return {
+        ...base,
         rows: r.rows,
         changed: r.filled,
-        detail:
-          r.value === null
-            ? 'No numeric values found to fill from'
-            : `${r.filled.toLocaleString()} cells filled with ${params.method} (${r.value})`,
+        detail: `${r.filled.toLocaleString()} cells filled with ${params.method} (${r.value})`,
       };
     }
     case 'fill-categorical': {
-      const r = fillCategorical(rows, params.column, params.fillValue);
+      const v = validateFillCategorical(dataset, params.column, params.fillValue);
+      if (!v.ok) throw new Error(v.error);
+      const r = fillCategorical(rows, params.column, v.value);
       return {
+        ...base,
         rows: r.rows,
         changed: r.filled,
-        detail: `${r.filled.toLocaleString()} cells filled with "${params.fillValue}"`,
+        detail: `${r.filled.toLocaleString()} cells filled with "${v.value}"`,
       };
     }
     case 'trim-whitespace': {
       const r = trimWhitespace(rows);
       return {
+        ...base,
         rows: r.rows,
         changed: r.changed,
         detail: `${r.changed.toLocaleString()} cells trimmed`,
       };
     }
     case 'convert-type': {
+      const v = validateConvertType(dataset, params.column, params.targetType);
+      if (!v.ok) throw new Error(v.error);
       const r = convertColumnType(rows, params.column, params.targetType);
       return {
+        ...base,
         rows: r.rows,
         changed: r.converted,
-        detail: `${r.converted.toLocaleString()} cells converted, ${r.failed.toLocaleString()} failed`,
+        detail:
+          `${r.converted.toLocaleString()} cells converted to ${params.targetType}` +
+          (r.failed > 0
+            ? `, ${r.failed.toLocaleString()} could not be converted and were left unchanged`
+            : ''),
+      };
+    }
+    case 'rename-column': {
+      const v = validateRename(params.column, params.newName, colNames);
+      if (!v.ok) throw new Error(v.error);
+      const r = renameColumn(rows, params.column, v.name);
+      return {
+        rows: r.rows,
+        changed: r.changed,
+        detail: `Renamed column "${params.column}" → "${v.name}" (${r.changed.toLocaleString()} rows)`,
+        afterColumns: colNames.map((n) =>
+          n === params.column ? v.name : n,
+        ),
+      };
+    }
+    case 'remove-column': {
+      const v = validateRemove(params.column, colNames);
+      if (!v.ok) throw new Error(v.error);
+      const r = removeColumn(rows, params.column);
+      return {
+        rows: r.rows,
+        changed: r.removed,
+        detail: `Removed column "${params.column}" — ${r.removed.toLocaleString()} cells in ${rows.length.toLocaleString()} rows deleted`,
+        afterColumns: colNames.filter((n) => n !== params.column),
       };
     }
     default:
@@ -99,12 +159,19 @@ export default function DataQuality() {
   const { dataset, originalDataset, updateDataset, resetDataset } = useData();
   const [op, setOp] = useState('remove-duplicates');
   const [column, setColumn] = useState('');
+  const [newName, setNewName] = useState('');
   const [method, setMethod] = useState('mean');
   const [fillValue, setFillValue] = useState('Unknown');
   const [targetType, setTargetType] = useState('numeric');
   const [dropColumns, setDropColumns] = useState([]);
   const [preview, setPreview] = useState(null);
   const [previewError, setPreviewError] = useState('');
+  const [confirming, setConfirming] = useState(false);
+  // Ordered history of applied steps. Each entry keeps a snapshot of the
+  // rows *before* the step, so any step can be reverted individually
+  // (reverting a step also undoes the steps applied after it, since those
+  // were computed from its result).
+  const [history, setHistory] = useState([]);
 
   const columns = useMemo(() => (dataset ? dataset.columns : []), [dataset]);
   const numericCols = useMemo(
@@ -112,23 +179,40 @@ export default function DataQuality() {
     [columns],
   );
   const categoricalCols = useMemo(
-    () => columns.filter((c) => c.type === 'categorical' || c.type === 'boolean'),
+    () =>
+      columns.filter((c) => c.type === 'categorical' || c.type === 'boolean'),
     [columns],
   );
+
+  // A freshly loaded dataset starts a clean slate: history snapshots belong
+  // to the previous dataset.
+  useEffect(() => {
+    setHistory([]);
+    setPreview(null);
+    setPreviewError('');
+    setConfirming(false);
+  }, [originalDataset]);
 
   // Sensible default column whenever the operation changes.
   const pickDefaultColumn = (nextOp) => {
     if (nextOp === 'fill-numeric') return numericCols[0]?.name || '';
     if (nextOp === 'fill-categorical') return categoricalCols[0]?.name || '';
-    if (nextOp === 'convert-type') return columns[0]?.name || '';
+    if (
+      nextOp === 'convert-type' ||
+      nextOp === 'rename-column' ||
+      nextOp === 'remove-column'
+    )
+      return columns[0]?.name || '';
     return '';
   };
 
   const handleOpChange = (nextOp) => {
     setOp(nextOp);
     setColumn(pickDefaultColumn(nextOp));
+    setNewName('');
     setPreview(null);
     setPreviewError('');
+    setConfirming(false);
   };
 
   const toggleDropColumn = (name) => {
@@ -136,27 +220,40 @@ export default function DataQuality() {
       prev.includes(name) ? prev.filter((c) => c !== name) : [...prev, name],
     );
     setPreview(null);
+    setConfirming(false);
   };
 
   const canRun = dataset && dataset.rows.length > 0;
 
   const needsColumn =
-    op === 'fill-numeric' || op === 'fill-categorical' || op === 'convert-type';
+    op === 'fill-numeric' ||
+    op === 'fill-categorical' ||
+    op === 'convert-type' ||
+    op === 'rename-column' ||
+    op === 'remove-column';
+
+  // Live validation feedback for renames.
+  const renameCheck =
+    op === 'rename-column' && column
+      ? validateRename(
+          column,
+          newName,
+          columns.map((c) => c.name),
+        )
+      : null;
 
   const handlePreview = () => {
     if (!canRun) return;
     setPreviewError('');
+    setConfirming(false);
     try {
       if (needsColumn && !column) {
         setPreviewError('Select a column for this operation.');
         return;
       }
-      if (op === 'fill-categorical' && fillValue.trim() === '') {
-        setPreviewError('Enter a fill value.');
-        return;
-      }
       const result = runOperation(op, dataset, {
         column,
+        newName,
         method,
         fillValue,
         targetType,
@@ -169,6 +266,7 @@ export default function DataQuality() {
         detail: result.detail,
         rows: result.rows.slice(0, 8),
         colNames: dataset.columns.map((c) => c.name),
+        afterColumns: result.afterColumns,
         resultRows: result.rows,
       });
     } catch (e) {
@@ -176,27 +274,74 @@ export default function DataQuality() {
     }
   };
 
+  // Step 1 of the explicit confirm: show the confirmation panel.
   const handleApply = () => {
     if (!preview) return;
-    const opLabel = OPERATIONS.find((o) => o.value === op)?.label || op;
-    const ok = window.confirm(
-      `Apply "${opLabel}"?\n\n${preview.detail}.\n\nOriginal can be restored with Undo.`,
-    );
-    if (!ok) return;
-    updateDataset(preview.resultRows, `${opLabel}: ${preview.detail}`);
-    setPreview(null);
+    setConfirming(true);
   };
 
-  const handleUndo = () => {
-    resetDataset();
+  // Step 2: the user confirmed — record history and apply.
+  const handleConfirmApply = () => {
+    if (!preview) return;
+    const opLabel = OPERATIONS.find((o) => o.value === op)?.label || op;
+    const entry = {
+      id: `step-${Date.now().toString(36)}`,
+      label: opLabel,
+      detail: preview.detail,
+      at: new Date().toISOString(),
+      // Pre-step snapshot: pure ops never mutate, so this reference stays
+      // a faithful, recoverable copy of the data before the step.
+      beforeRows: dataset.rows,
+    };
+    setHistory((h) => [...h, entry]);
+    updateDataset(preview.resultRows, `${opLabel}: ${preview.detail}`);
+    setPreview(null);
+    setConfirming(false);
+    setDropColumns([]);
+  };
+
+  /** Revert the dataset to before history step `index`. */
+  const handleRevertStep = (index) => {
+    const entry = history[index];
+    if (!entry) return;
+    const later = history.length - index - 1;
+    const ok = window.confirm(
+      `Revert "${entry.label}"?\n\n${entry.detail}.\n\n` +
+        (later > 0
+          ? `This also undoes the ${later} step${later === 1 ? '' : 's'} applied after it.`
+          : 'The dataset returns to how it was before this step.'),
+    );
+    if (!ok) return;
+    updateDataset(
+      entry.beforeRows,
+      `Reverted to before step ${index + 1}: ${entry.label}`,
+    );
+    setHistory((h) => h.slice(0, index));
     setPreview(null);
     setPreviewError('');
+    setConfirming(false);
+  };
+
+  const handleRestoreOriginal = () => {
+    const ok = window.confirm(
+      'Restore the original dataset?\n\nAll cleaning steps will be discarded.',
+    );
+    if (!ok) return;
+    resetDataset();
+    setHistory([]);
+    setPreview(null);
+    setPreviewError('');
+    setConfirming(false);
   };
 
   // Dataset differs from original once a cleaning op has been applied
   // (updateDataset builds a new object; resetDataset restores the reference).
-  const isDirty =
-    !!dataset && !!originalDataset && dataset !== originalDataset;
+  const isDirty = !!dataset && !!originalDataset && dataset !== originalDataset;
+
+  const opLabel = OPERATIONS.find((o) => o.value === op)?.label || op;
+  const columnsChanged =
+    preview &&
+    preview.afterColumns.join('|') !== preview.colNames.join('|');
 
   return (
     <div className="space-y-6">
@@ -252,6 +397,7 @@ export default function DataQuality() {
                       onChange={(e) => {
                         setColumn(e.target.value);
                         setPreview(null);
+                        setConfirming(false);
                       }}
                       className={selectCls}
                     >
@@ -271,6 +417,7 @@ export default function DataQuality() {
                       onChange={(e) => {
                         setMethod(e.target.value);
                         setPreview(null);
+                        setConfirming(false);
                       }}
                       className={selectCls}
                     >
@@ -292,6 +439,7 @@ export default function DataQuality() {
                       onChange={(e) => {
                         setColumn(e.target.value);
                         setPreview(null);
+                        setConfirming(false);
                       }}
                       className={selectCls}
                     >
@@ -312,6 +460,7 @@ export default function DataQuality() {
                       onChange={(e) => {
                         setFillValue(e.target.value);
                         setPreview(null);
+                        setConfirming(false);
                       }}
                       className={inputCls}
                     />
@@ -330,6 +479,7 @@ export default function DataQuality() {
                       onChange={(e) => {
                         setColumn(e.target.value);
                         setPreview(null);
+                        setConfirming(false);
                       }}
                       className={selectCls}
                     >
@@ -349,6 +499,7 @@ export default function DataQuality() {
                       onChange={(e) => {
                         setTargetType(e.target.value);
                         setPreview(null);
+                        setConfirming(false);
                       }}
                       className={selectCls}
                     >
@@ -358,6 +509,89 @@ export default function DataQuality() {
                         </option>
                       ))}
                     </select>
+                  </div>
+                </>
+              )}
+
+              {op === 'rename-column' && (
+                <>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
+                      Column
+                    </label>
+                    <select
+                      value={column}
+                      onChange={(e) => {
+                        setColumn(e.target.value);
+                        setPreview(null);
+                        setConfirming(false);
+                      }}
+                      className={selectCls}
+                    >
+                      {columns.map((c) => (
+                        <option key={c.name} value={c.name}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
+                      New name
+                    </label>
+                    <input
+                      type="text"
+                      value={newName}
+                      onChange={(e) => {
+                        setNewName(e.target.value);
+                        setPreview(null);
+                        setConfirming(false);
+                      }}
+                      placeholder="e.g. order_id"
+                      className={inputCls}
+                    />
+                    {renameCheck && newName.trim() !== '' && (
+                      <p
+                        className={`mt-1 text-xs ${renameCheck.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}
+                      >
+                        {renameCheck.ok
+                          ? `“${column}” will be renamed to “${renameCheck.name}”.`
+                          : renameCheck.error}
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {op === 'remove-column' && (
+                <>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
+                      Column
+                    </label>
+                    <select
+                      value={column}
+                      onChange={(e) => {
+                        setColumn(e.target.value);
+                        setPreview(null);
+                        setConfirming(false);
+                      }}
+                      className={selectCls}
+                    >
+                      {columns.map((c) => (
+                        <option key={c.name} value={c.name}>
+                          {c.name} ({c.type})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300">
+                    <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                    <span>
+                      Removing a column deletes it from every row. Preview and
+                      confirm carefully — you can revert afterwards from the
+                      history below.
+                    </span>
                   </div>
                 </>
               )}
@@ -404,7 +638,7 @@ export default function DataQuality() {
               </button>
               <button
                 onClick={handleApply}
-                disabled={!preview}
+                disabled={!preview || confirming}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
               >
                 <BrushCleaning size={15} />
@@ -412,7 +646,7 @@ export default function DataQuality() {
               </button>
               {isDirty && (
                 <button
-                  onClick={handleUndo}
+                  onClick={handleRestoreOriginal}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 px-3 py-1.5 text-sm text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/40"
                 >
                   <Undo2 size={15} />
@@ -420,6 +654,37 @@ export default function DataQuality() {
                 </button>
               )}
             </div>
+
+            {/* Explicit in-app confirmation before anything changes */}
+            {confirming && preview && (
+              <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/40">
+                <p className="flex items-center gap-2 text-sm font-semibold text-amber-900 dark:text-amber-200">
+                  <AlertTriangle size={15} />
+                  Confirm: apply “{opLabel}”?
+                </p>
+                <p className="mt-1 text-sm text-amber-800 dark:text-amber-300">
+                  {preview.detail}. Rows: {preview.before.toLocaleString()} →{' '}
+                  {preview.after.toLocaleString()}.
+                  {columnsChanged &&
+                    ` Columns: ${preview.colNames.length} → ${preview.afterColumns.length}.`}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    onClick={handleConfirmApply}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700"
+                  >
+                    <BrushCleaning size={15} />
+                    Yes, apply this change
+                  </button>
+                  <button
+                    onClick={() => setConfirming(false)}
+                    className="rounded-lg border border-amber-300 px-3 py-1.5 text-sm text-amber-800 hover:bg-amber-100 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Preview result */}
             {preview && (
@@ -433,15 +698,27 @@ export default function DataQuality() {
                     Changed:{' '}
                     <strong>{preview.changed.toLocaleString()}</strong>
                   </span>
+                  {columnsChanged && (
+                    <span>
+                      Columns: <strong>{preview.colNames.length}</strong> →{' '}
+                      <strong>{preview.afterColumns.length}</strong>
+                    </span>
+                  )}
                   <span className="text-slate-500 dark:text-slate-400">
                     {preview.detail}
                   </span>
                 </div>
+                {columnsChanged && (
+                  <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
+                    {preview.colNames.join(', ')} →{' '}
+                    {preview.afterColumns.join(', ')}
+                  </p>
+                )}
                 <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
                   <table className="w-full border-collapse text-xs">
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/60">
-                        {preview.colNames.map((name) => (
+                        {preview.afterColumns.map((name) => (
                           <th
                             key={name}
                             className="whitespace-nowrap px-2 py-1.5 text-left font-semibold text-slate-600 dark:text-slate-300"
@@ -457,11 +734,13 @@ export default function DataQuality() {
                           key={i}
                           className="border-b border-slate-100 last:border-0 dark:border-slate-800/60"
                         >
-                          {preview.colNames.map((name) => (
+                          {preview.afterColumns.map((name) => (
                             <td
                               key={name}
                               className="max-w-[200px] truncate px-2 py-1.5 text-slate-700 dark:text-slate-300"
-                              title={isMissing(row[name]) ? '' : String(row[name])}
+                              title={
+                                isMissing(row[name]) ? '' : String(row[name])
+                              }
                             >
                               {isMissing(row[name]) ? '—' : String(row[name])}
                             </td>
@@ -476,6 +755,44 @@ export default function DataQuality() {
                   Showing first 8 resulting rows. Apply to make this the active
                   dataset.
                 </p>
+              </div>
+            )}
+
+            {/* Transformation history */}
+            {history.length > 0 && (
+              <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950/60">
+                <h3 className="flex items-center gap-1.5 text-sm font-semibold text-slate-900 dark:text-white">
+                  <History size={15} />
+                  Transformation history ({history.length})
+                </h3>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                  Each step stores the data from before it ran. Reverting a
+                  step also undoes the steps applied after it.
+                </p>
+                <ol className="mt-2 space-y-1.5">
+                  {history.map((entry, i) => (
+                    <li
+                      key={entry.id}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 dark:border-slate-700 dark:bg-slate-900"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-200">
+                          Step {i + 1}: {entry.label}
+                        </p>
+                        <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                          {entry.detail}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleRevertStep(i)}
+                        className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+                      >
+                        <Undo2 size={12} />
+                        Revert to here
+                      </button>
+                    </li>
+                  ))}
+                </ol>
               </div>
             )}
           </div>

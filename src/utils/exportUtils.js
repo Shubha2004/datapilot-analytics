@@ -3,10 +3,27 @@
  * DataPilot Analytics. All browser-only.
  */
 
-/** Escape one CSV cell with proper quoting. */
+/**
+ * Escape one CSV cell with proper quoting.
+ *
+ * CSV formula-injection defence (OWASP): if the cell's first non-whitespace
+ * character is one of = + - @, tab or CR, prefix a single quote so
+ * spreadsheet apps treat it as text instead of executing it as a formula.
+ * Plain numbers (including negatives) are left alone so numeric exports
+ * stay numeric. The quote keeps the CSV itself valid and round-trippable.
+ */
+const NUMERIC_LITERAL_RE = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/;
+
 function escapeCell(v) {
   if (v === null || v === undefined) return '';
-  const s = String(v);
+  let s = String(v);
+  if (
+    typeof v !== 'number' &&
+    /^\s*[=+\-@\t\r]/.test(s) &&
+    !NUMERIC_LITERAL_RE.test(s.trim())
+  ) {
+    s = "'" + s;
+  }
   return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
 
@@ -54,6 +71,9 @@ export function exportDatasetCSV(dataset) {
 export function downloadChartPNG(svgEl, filename) {
   return new Promise((resolve, reject) => {
     const fail = (msg) => reject(new Error('Chart PNG export failed: ' + msg));
+    // Hoisted so the outer catch can revoke the object URL if anything
+    // throws after it was created but before img.src was assigned.
+    let url = null;
     try {
       if (!svgEl || typeof svgEl.cloneNode !== 'function') {
         fail('no chart element provided');
@@ -81,7 +101,7 @@ export function downloadChartPNG(svgEl, filename) {
 
       const svgText = new XMLSerializer().serializeToString(clone);
       const svgBlob = new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' });
-      const url = URL.createObjectURL(svgBlob);
+      url = URL.createObjectURL(svgBlob);
       const img = new Image();
 
       img.onload = () => {
@@ -119,6 +139,7 @@ export function downloadChartPNG(svgEl, filename) {
       };
       img.src = url;
     } catch (e) {
+      if (url) URL.revokeObjectURL(url);
       fail(e && e.message ? e.message : 'unknown error');
     }
   });

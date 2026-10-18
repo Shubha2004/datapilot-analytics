@@ -14,6 +14,8 @@ import {
   loadDataset,
   saveDataset,
   clearStoredDataset,
+  classifyStorageError,
+  storageErrorMessage,
 } from '../utils/storage'
 
 const THEME_KEY = 'datapilot:theme'
@@ -21,6 +23,18 @@ const PREFS_KEY = 'datapilot:prefs'
 const CHARTS_KEY = 'datapilot:charts'
 
 const DEFAULT_PREFS = { persistCharts: true, persistDataset: false }
+
+/**
+ * Per-target persistence status exposed to the UI so the Settings toggles
+ * reflect real save outcomes: { state: 'idle'|'saving'|'ok'|'failed',
+ * message: string|null }.
+ */
+const IDLE_PERSISTENCE = { state: 'idle', message: null }
+const OK_PERSISTENCE = { state: 'ok', message: null }
+const failedPersistence = (error) => ({
+  state: 'failed',
+  message: storageErrorMessage(error),
+})
 
 function readJSON(key, fallback) {
   try {
@@ -105,15 +119,42 @@ export function DataProvider({ children }) {
   }))
 
   const updatePrefs = useCallback((patch) => {
-    setPrefs((p) => ({ ...p, ...patch }))
+    setPrefs((p) => {
+      const next = { ...p, ...patch }
+      // Toggle-off deletes the previously stored copy immediately so stale
+      // data never lingers after the user revokes consent. Both calls are
+      // idempotent, so a double-invoked updater is harmless.
+      if (p.persistDataset && !next.persistDataset) void clearStoredDataset()
+      if (p.persistCharts && !next.persistCharts) {
+        try {
+          localStorage.removeItem(CHARTS_KEY)
+        } catch {
+          // storage unavailable — nothing stored anyway
+        }
+      }
+      return next
+    })
   }, [])
 
+  // Honest persistence bookkeeping: each target records whether its last
+  // save actually succeeded, so the UI never claims "saved" on a failure.
+  const [persistenceStatus, setPersistenceStatus] = useState({
+    prefs: OK_PERSISTENCE,
+    charts: IDLE_PERSISTENCE,
+    dataset: IDLE_PERSISTENCE,
+  })
+
   useEffect(() => {
+    let result
     try {
       localStorage.setItem(PREFS_KEY, JSON.stringify(prefs))
-    } catch {
-      // quota / privacy mode — prefs simply won't survive reloads
+      result = OK_PERSISTENCE
+    } catch (e) {
+      // quota / privacy mode — prefs simply won't survive reloads, and the
+      // UI must say so instead of silently pretending otherwise
+      result = failedPersistence(classifyStorageError(e))
     }
+    setPersistenceStatus((s) => (s.prefs === result ? s : { ...s, prefs: result }))
   }, [prefs])
 
   // ---- Saved charts ------------------------------------------------------
@@ -134,7 +175,23 @@ export function DataProvider({ children }) {
 
   useEffect(() => {
     if (!chartsHydrated.current) return
-    if (prefs.persistCharts) saveCharts(savedCharts)
+    if (!prefs.persistCharts) {
+      setPersistenceStatus((s) =>
+        s.charts === IDLE_PERSISTENCE ? s : { ...s, charts: IDLE_PERSISTENCE },
+      )
+      return
+    }
+    let cancelled = false
+    saveCharts(savedCharts).then((res) => {
+      if (cancelled) return
+      setPersistenceStatus((s) => ({
+        ...s,
+        charts: res.ok ? OK_PERSISTENCE : failedPersistence(res.error),
+      }))
+    })
+    return () => {
+      cancelled = true
+    }
   }, [savedCharts, prefs.persistCharts])
 
   const addChart = useCallback((cfg) => {
@@ -155,12 +212,23 @@ export function DataProvider({ children }) {
 
   // ---- Persisted dataset -------------------------------------------------
   // On mount, restore a previously persisted dataset when the user opted in.
+  // Uploads are never persisted silently: this is the only restore path and
+  // it runs solely under the explicit persistDataset opt-in.
   useEffect(() => {
     let cancelled = false
     const { persistDataset } = readJSON(PREFS_KEY, DEFAULT_PREFS)
     if (!persistDataset) return
-    loadDataset().then((stored) => {
-      if (!cancelled && stored) setDataset(stored)
+    loadDataset().then((res) => {
+      if (cancelled) return
+      if (res.found) {
+        setDataset(res.dataset)
+      } else if (res.error) {
+        // Opted in but the restore itself failed — say so, don't pretend.
+        setPersistenceStatus((s) => ({
+          ...s,
+          dataset: failedPersistence(res.error),
+        }))
+      }
     })
     return () => {
       cancelled = true
@@ -168,9 +236,31 @@ export function DataProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Watch for dataset changes and persist when opted in.
+  // Watch for dataset changes and persist when opted in. The outcome is
+  // recorded in persistenceStatus so the toggle reflects real
+  // success/failure instead of assuming the write worked.
   useEffect(() => {
-    if (prefs.persistDataset && dataset) saveDataset(dataset)
+    if (!prefs.persistDataset || !dataset) {
+      setPersistenceStatus((s) =>
+        s.dataset === IDLE_PERSISTENCE ? s : { ...s, dataset: IDLE_PERSISTENCE },
+      )
+      return
+    }
+    let cancelled = false
+    setPersistenceStatus((s) => ({
+      ...s,
+      dataset: { state: 'saving', message: null },
+    }))
+    saveDataset(dataset).then((res) => {
+      if (cancelled) return
+      setPersistenceStatus((s) => ({
+        ...s,
+        dataset: res.ok ? OK_PERSISTENCE : failedPersistence(res.error),
+      }))
+    })
+    return () => {
+      cancelled = true
+    }
   }, [dataset, prefs.persistDataset])
 
   // ---- Danger zone -------------------------------------------------------
@@ -191,6 +281,11 @@ export function DataProvider({ children }) {
     await clearStoredDataset()
     setSavedCharts([])
     setPrefs(DEFAULT_PREFS)
+    setPersistenceStatus({
+      prefs: OK_PERSISTENCE,
+      charts: IDLE_PERSISTENCE,
+      dataset: IDLE_PERSISTENCE,
+    })
     setDatasetState(null)
     setOriginalDataset(null)
   }, [])
@@ -216,6 +311,7 @@ export function DataProvider({ children }) {
       deleteChart,
       prefs,
       updatePrefs,
+      persistenceStatus,
       clearLocalData,
     }),
     [
@@ -236,6 +332,7 @@ export function DataProvider({ children }) {
       deleteChart,
       prefs,
       updatePrefs,
+      persistenceStatus,
       clearLocalData,
     ],
   )

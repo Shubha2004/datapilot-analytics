@@ -2,7 +2,7 @@
  * NLQBar.jsx — natural-language query bar for DataPilot Analytics.
  * No props. Renders nothing when no dataset is loaded.
  */
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Search,
   Sparkles,
@@ -10,6 +10,8 @@ import {
   TriangleAlert,
   Lightbulb,
   LoaderCircle,
+  CircleHelp,
+  Info,
 } from 'lucide-react'
 import { useData } from '../context/DataContext'
 import ChartRenderer from './ChartRenderer'
@@ -110,6 +112,16 @@ export default function NLQBar() {
   const [result, setResult] = useState(null)
   const [savedFlash, setSavedFlash] = useState(false)
   const [showAllExamples, setShowAllExamples] = useState(false)
+
+  // Clear the deferred "thinking" timer on unmount so a late callback can't
+  // call setState after the component is gone.
+  const thinkTimer = useRef(null)
+  useEffect(
+    () => () => {
+      if (thinkTimer.current) window.clearTimeout(thinkTimer.current)
+    },
+    [],
+  )
 
   if (!dataset) return null
 
@@ -215,7 +227,31 @@ export default function NLQBar() {
 
       {res && !thinking && (
         <div className="mt-4 space-y-4 border-t border-slate-200 pt-4 dark:border-slate-800">
-          {res.error ? (
+          {res.clarification ? (
+            <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4 dark:border-indigo-900/60 dark:bg-indigo-950/30">
+              <p className="flex items-start gap-2 text-sm font-medium text-indigo-900 dark:text-indigo-200">
+                <CircleHelp size={16} className="mt-0.5 shrink-0" />
+                {res.clarification.prompt}
+              </p>
+              {Array.isArray(res.clarification.options) && res.clarification.options.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {res.clarification.options.map((o) => (
+                    <button
+                      key={o.query}
+                      type="button"
+                      onClick={() => {
+                        setQuestion(o.query)
+                        runQuery(o.query)
+                      }}
+                      className="rounded-full border border-indigo-300 bg-white px-3 py-1 text-xs font-medium text-indigo-800 transition hover:bg-indigo-100 dark:border-indigo-800 dark:bg-slate-900 dark:text-indigo-200 dark:hover:bg-indigo-950"
+                    >
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : res.error ? (
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/60 dark:bg-amber-950/30">
               <p className="flex items-start gap-2 text-sm font-medium text-amber-800 dark:text-amber-200">
                 <TriangleAlert size={16} className="mt-0.5 shrink-0" />
@@ -246,6 +282,40 @@ export default function NLQBar() {
             </div>
           ) : (
             <>
+              {res.interpretation && (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/40">
+                  <p className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-200">
+                    <Info size={16} className="mt-0.5 shrink-0 text-slate-400" />
+                    <span>
+                      <span className="font-medium">Interpreted as: </span>
+                      {res.interpretation.plain}
+                    </span>
+                  </p>
+                  {Array.isArray(res.interpretation.columns) && res.interpretation.columns.length > 0 && (
+                    <div className="mt-2.5 flex flex-wrap gap-1.5">
+                      {res.interpretation.columns.map((c) => (
+                        <span
+                          key={c.name}
+                          title={c.role}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                        >
+                          <code className="font-mono font-semibold text-slate-800 dark:text-slate-100">
+                            {c.name}
+                          </code>
+                          <span className="text-slate-400 dark:text-slate-500">{c.type}</span>
+                          <span className="text-slate-500 dark:text-slate-400">· {c.role}</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {res.interpretation.calculation && (
+                    <p className="mt-2 font-mono text-xs text-slate-500 dark:text-slate-400">
+                      {res.interpretation.calculation}
+                    </p>
+                  )}
+                </div>
+              )}
+
               {res.sql && (
                 <div>
                   <p className="mb-1.5 text-xs font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">

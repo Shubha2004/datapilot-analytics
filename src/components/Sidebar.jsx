@@ -1,5 +1,8 @@
-import { X, ChevronLeft, ChevronRight, Database } from 'lucide-react'
 import {
+  X,
+  ChevronLeft,
+  ChevronRight,
+  Database,
   LayoutDashboard,
   Table2,
   ShieldCheck,

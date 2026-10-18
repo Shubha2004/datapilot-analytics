@@ -165,18 +165,15 @@ function BoxPlotSVG({ data, height, tick, grid }) {
 }
 
 export default function ChartRenderer({ config, dataset, height = 300 }) {
+  // Called unconditionally at the top: this component always renders inside
+  // DataProvider, and hooks must not be called inside try/catch blocks.
+  const { theme } = useData();
+
   const { data, seriesKeys, error } = useMemo(
     () => buildChartData(dataset, config),
     [dataset, config]
   );
 
-  let theme = 'dark';
-  try {
-    const ctx = useData();
-    if (ctx && typeof ctx.theme === 'string') theme = ctx.theme;
-  } catch {
-    theme = 'dark';
-  }
   const dark = theme !== 'light';
   const tick = dark ? '#94a3b8' : '#64748b';
   const grid = dark ? '#1e293b' : '#e2e8f0';

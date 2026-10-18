@@ -72,7 +72,22 @@ const STACK = [
 ]
 
 export default function Settings() {
-  const { theme, toggleTheme, prefs, updatePrefs, clearLocalData } = useData()
+  const { theme, toggleTheme, prefs, updatePrefs, clearLocalData, persistenceStatus } =
+    useData()
+
+  const statusNote = (s, okText) => {
+    if (!s) return null
+    if (s.state === 'failed' && s.message) {
+      return <p className="mt-1.5 text-xs font-medium text-red-600 dark:text-red-400">{s.message}</p>
+    }
+    if (s.state === 'saving') {
+      return <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">Saving…</p>
+    }
+    if (s.state === 'ok' && okText) {
+      return <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">{okText}</p>
+    }
+    return null
+  }
 
   return (
     <div className="space-y-6">
@@ -100,22 +115,28 @@ export default function Settings() {
           title="Remember saved charts"
           description="Saved chart configurations are stored in this browser's local storage."
           control={
-            <Toggle
-              label="Remember saved charts"
-              checked={prefs.persistCharts}
-              onChange={(v) => updatePrefs({ persistCharts: v })}
-            />
+            <div className="text-right">
+              <Toggle
+                label="Remember saved charts"
+                checked={prefs.persistCharts}
+                onChange={(v) => updatePrefs({ persistCharts: v })}
+              />
+              {statusNote(persistenceStatus?.charts, 'Saved locally.')}
+            </div>
           }
         />
         <Row
           title="Persist current dataset"
           description="Store the current dataset in this browser (IndexedDB) so it reloads on your next visit."
           control={
-            <Toggle
-              label="Persist current dataset"
-              checked={prefs.persistDataset}
-              onChange={(v) => updatePrefs({ persistDataset: v })}
-            />
+            <div className="text-right">
+              <Toggle
+                label="Persist current dataset"
+                checked={prefs.persistDataset}
+                onChange={(v) => updatePrefs({ persistDataset: v })}
+              />
+              {statusNote(persistenceStatus?.dataset, 'Dataset stored locally.')}
+            </div>
           }
         />
         <p className="rounded-lg bg-amber-50 p-3 text-xs leading-relaxed text-amber-800 dark:bg-amber-950/40 dark:text-amber-200/90">

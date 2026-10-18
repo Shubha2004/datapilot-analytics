@@ -1,7 +1,20 @@
 /**
  * insights.js — auto-generated data insights for DataPilot Analytics.
- * Each insight: { id, title, body, kind } with kind in
- * 'info' | 'warning' | 'success'. Only emitted when the data supports it.
+ *
+ * Each insight carries the legacy shape { id, title, body, kind } with kind in
+ * 'info' | 'warning' | 'success' (kept for backwards compatibility), plus a
+ * rich additive layer rendered by InsightCard:
+ *
+ *   headline      — short headline (often mirrors title)
+ *   finding       — the one-sentence finding
+ *   values        — object of the actual supporting numbers
+ *   calculation   — string describing the computation performed
+ *   whyItMatters  — business relevance of the finding
+ *   nextStep      — recommended follow-up action
+ *   caveat        — confidence / data-quality caveat
+ *
+ * Only insights the data supports are emitted (existing data-gating kept).
+ * All detection is rule-based — nothing here is described as AI.
  */
 import { describeColumn, correlationMatrix, linearTrend } from './statistics';
 import { isMissing, toNumber } from './dataTypes';
@@ -62,12 +75,13 @@ const MAX_INSIGHTS = 8;
 
 /**
  * Generate up to ~8 insights for the dataset. Returns
- * [{ id, title, body, kind }].
+ * [{ id, title, body, kind, headline, finding, values, calculation,
+ *    whyItMatters, nextStep, caveat }].
  */
 export function generateInsights(dataset) {
   const out = [];
-  const push = (id, title, body, kind) => {
-    if (out.length < MAX_INSIGHTS) out.push({ id, title, body, kind });
+  const push = (id, title, body, kind, extra = {}) => {
+    if (out.length < MAX_INSIGHTS) out.push({ id, title, body, kind, ...extra });
   };
 
   if (!dataset || !Array.isArray(dataset.rows) || dataset.rows.length === 0) {
@@ -80,8 +94,15 @@ export function generateInsights(dataset) {
   const dateCol = cols.find((c) => c.type === 'date');
   const numericCols = cols.filter((c) => c.type === 'numeric');
 
+  const isSample = !!(dataset.meta && dataset.meta.source === 'sample');
+  const sampleCaveat =
+    `n=${rows.length.toLocaleString('en-US')} synthetic rows generated locally for demonstration ` +
+    `— patterns are illustrative, not real business evidence.`;
+
   // 6. Dataset summary ------------------------------------------------
   let summary = `Dataset spans ${fmtNum(rows.length)} rows and ${cols.length} columns.`;
+  let rangeStart = null;
+  let rangeEnd = null;
   if (dateCol) {
     const dates = rows
       .map((r) => r[dateCol.name])
@@ -89,10 +110,28 @@ export function generateInsights(dataset) {
       .map(String)
       .sort();
     if (dates.length > 0) {
-      summary += ` Data runs from ${fmtDate(dates[0])} to ${fmtDate(dates[dates.length - 1])}.`;
+      rangeStart = dates[0];
+      rangeEnd = dates[dates.length - 1];
+      summary += ` Data runs from ${fmtDate(rangeStart)} to ${fmtDate(rangeEnd)}.`;
     }
   }
-  push('ins-summary', 'Dataset overview', summary, 'info');
+  push('ins-summary', 'Dataset overview', summary, 'info', {
+    headline: 'Dataset overview',
+    finding: summary,
+    values: {
+      rows: rows.length,
+      columns: cols.length,
+      ...(rangeStart ? { startDate: rangeStart, endDate: rangeEnd } : {}),
+    },
+    calculation: rangeStart
+      ? `COUNT(rows), COUNT(columns); MIN/MAX(${dateCol.name}) for the date range`
+      : 'COUNT(rows), COUNT(columns)',
+    whyItMatters:
+      'Every chart and statistic in this report describes exactly this data window — ' +
+      'conclusions do not extend beyond it.',
+    nextStep: 'Confirm this is the complete dataset you intended to analyze before sharing the report.',
+    caveat: isSample ? sampleCaveat : 'Counts reflect the uploaded file as-is.',
+  });
 
   // 1. Top & bottom category ------------------------------------------
   if (firstCat && firstNum) {
@@ -110,13 +149,29 @@ export function generateInsights(dataset) {
       const [topK, topV] = entries[0];
       const [botK, botV] = entries[entries.length - 1];
       const ratio = botV > 0 ? topV / botV : null;
-      push(
-        'ins-topcat',
-        `${topK} leads ${firstNum.name}`,
+      const body =
         `${topK} leads ${firstNum.name} at ${fmtMoney(topV)}` +
-          (ratio !== null ? `, ${ratio.toFixed(1)}× ${botK} (${fmtMoney(botV)}).` : '.'),
-        'success'
-      );
+        (ratio !== null ? `, ${ratio.toFixed(1)}× ${botK} (${fmtMoney(botV)}).` : '.');
+      push('ins-topcat', `${topK} leads ${firstNum.name}`, body, 'success', {
+        headline: `${topK} leads ${firstNum.name}`,
+        finding: body,
+        values: {
+          topCategory: topK,
+          [`top${cap(firstNum.name)}`]: topV,
+          bottomCategory: botK,
+          [`bottom${cap(firstNum.name)}`]: botV,
+          distinctCategories: entries.length,
+          ...(ratio !== null ? { leadRatio: Math.round(ratio * 10) / 10 } : {}),
+        },
+        calculation: `SUM(${firstNum.name}) GROUP BY ${firstCat.name}, ranked descending`,
+        whyItMatters:
+          `Concentration in ${topK} is both a growth lever and a risk — a slip there moves the total.`,
+        nextStep:
+          `Dig into what drives ${topK}'s lead (volume, pricing, or region) before reallocating budget.`,
+        caveat:
+          (isSample ? sampleCaveat + ' ' : '') +
+          `Rows with missing ${firstCat.name} or non-numeric ${firstNum.name} are excluded.`,
+      });
     }
   }
 
@@ -150,12 +205,29 @@ export function generateInsights(dataset) {
         t.slope !== null && t.direction !== 'flat'
           ? ` (about ${fmtMoney(Math.abs(t.slope))} per month)`
           : '';
-      push(
-        'ins-trend',
-        `${cap(firstNum.name)} trend`,
-        `${cap(firstNum.name)} ${verb} from ${startName} to ${endName} ${year}${slopeTxt}.`,
-        t.direction === 'increasing' ? 'success' : t.direction === 'decreasing' ? 'warning' : 'info'
-      );
+      const body = `${cap(firstNum.name)} ${verb} from ${startName} to ${endName} ${year}${slopeTxt}.`;
+      push('ins-trend', `${cap(firstNum.name)} trend`, body, t.direction === 'increasing' ? 'success' : t.direction === 'decreasing' ? 'warning' : 'info', {
+        headline: `${cap(firstNum.name)} trend`,
+        finding: body,
+        values: {
+          direction: t.direction,
+          slopePerMonth: t.slope,
+          startMonth: keys[0],
+          endMonth: keys[keys.length - 1],
+          months: keys.length,
+        },
+        calculation:
+          `SUM(${firstNum.name}) per calendar month; ordinary least-squares fit ` +
+          `on the ${keys.length} monthly totals`,
+        whyItMatters:
+          'Trend direction shapes forecasts and resourcing — know whether the metric is accelerating or cooling.',
+        nextStep:
+          'Check the chart for one-off spikes, then re-run excluding the most extreme month to test robustness.',
+        caveat:
+          'Linear fit only — seasonality and one-off events are not modelled; ' +
+          'small month counts make the slope fragile.' +
+          (isSample ? ' ' + sampleCaveat : ''),
+      });
     }
   }
 
@@ -172,12 +244,24 @@ export function generateInsights(dataset) {
     }
     pairs.sort((p, q) => Math.abs(q.r) - Math.abs(p.r));
     for (const p of pairs.slice(0, 2)) {
-      push(
-        `ins-corr-${p.a}-${p.b}`,
-        `Strong correlation: ${p.a} and ${p.b}`,
-        `${p.a} and ${p.b} move together (r=${p.r.toFixed(2)}). Correlation does not imply causation.`,
-        'info'
-      );
+      const body =
+        `${p.a} and ${p.b} move together (r=${p.r.toFixed(2)}). Correlation does not imply causation.`;
+      push(`ins-corr-${p.a}-${p.b}`, `Strong correlation: ${p.a} and ${p.b}`, body, 'info', {
+        headline: `Strong correlation: ${p.a} and ${p.b}`,
+        finding: body,
+        values: {
+          columnA: p.a,
+          columnB: p.b,
+          pearsonR: Math.round(p.r * 100) / 100,
+        },
+        calculation: 'Pearson correlation on pairwise-complete numeric rows; |r| ≥ 0.7 flagged',
+        whyItMatters:
+          'Highly correlated columns carry overlapping information — useful for prediction, redundant for dashboards.',
+        nextStep: `Plot ${p.a} against ${p.b} as a scatter chart to inspect the relationship visually.`,
+        caveat:
+          'Rule-based flag (|r| ≥ 0.7) on this dataset only; correlation does not imply causation.' +
+          (isSample ? ' ' + sampleCaveat : ''),
+      });
     }
   }
 
@@ -185,13 +269,25 @@ export function generateInsights(dataset) {
   for (const c of numericCols) {
     const d = describeColumn(rows.map((r) => r[c.name]));
     if (d.outlierCount > 0 && d.median !== null) {
-      push(
-        'ins-outliers',
-        `Unusual values in ${c.name}`,
+      const body =
         `Unusually large values in ${c.name}: max ${fmtMoney(d.max)} vs median ${fmtMoney(d.median)} ` +
-          `(${d.outlierCount} outlier${d.outlierCount === 1 ? '' : 's'} detected).`,
-        'warning'
-      );
+        `(${d.outlierCount} outlier${d.outlierCount === 1 ? '' : 's'} detected).`;
+      push('ins-outliers', `Unusual values in ${c.name}`, body, 'warning', {
+        headline: `Unusual values in ${c.name}`,
+        finding: body,
+        values: {
+          column: c.name,
+          max: d.max,
+          median: d.median,
+          outlierCount: d.outlierCount,
+        },
+        calculation: `1.5 × IQR (Tukey) fences on ${c.name}`,
+        whyItMatters:
+          'Outliers can dominate sums and averages — decide whether they are errors or genuine extremes before trusting totals.',
+        nextStep:
+          `Validate the flagged ${c.name} rows at the source; exclude and re-run if they are data-entry errors.`,
+        caveat: 'The IQR rule is a heuristic — skewed distributions and small samples trigger it easily.',
+      });
       break;
     }
   }
@@ -201,13 +297,24 @@ export function generateInsights(dataset) {
     const miss = rows.reduce((acc, r) => acc + (isMissing(r[c.name]) ? 1 : 0), 0);
     const pct = rows.length > 0 ? miss / rows.length : 0;
     if (pct > 0.2) {
-      push(
-        `ins-missing-${c.name}`,
-        `Missing data in ${c.name}`,
+      const body =
         `${fmtPct(pct)} of values in "${c.name}" are missing ` +
-          `(${fmtNum(miss)} of ${fmtNum(rows.length)} rows). Consider checking the source or excluding this column.`,
-        'warning'
-      );
+        `(${fmtNum(miss)} of ${fmtNum(rows.length)} rows). Consider checking the source or excluding this column.`;
+      push(`ins-missing-${c.name}`, `Missing data in ${c.name}`, body, 'warning', {
+        headline: `Missing data in ${c.name}`,
+        finding: body,
+        values: {
+          column: c.name,
+          missingCount: miss,
+          missingPct: Math.round(pct * 1000) / 1000,
+          totalRows: rows.length,
+        },
+        calculation: `COUNT(missing) / COUNT(rows) for ${c.name}`,
+        whyItMatters: 'Missing values silently shrink every statistic and chart that uses this column.',
+        nextStep:
+          `Check the source system for ${c.name}; consider excluding the column or filling gaps before analysis.`,
+        caveat: 'The >20% bar is a rule of thumb — domain knowledge may justify a different threshold.',
+      });
     }
   }
 

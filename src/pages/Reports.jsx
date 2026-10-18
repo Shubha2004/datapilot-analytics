@@ -1,6 +1,12 @@
 /**
  * Reports.jsx — printable analytics report for DataPilot Analytics.
  * Toolbar actions are wrapped in .no-print (hidden by the print stylesheet).
+ *
+ * Key insights render as rich InsightCard components (rule-based findings).
+ * The Consolidated report section is powered by buildReportData
+ * from ../utils/reportBuilder.js. "Export KPI summary (CSV)" and "Export
+ * quality report (CSV)" toolbar buttons render when exportUtils exposes
+ * those functions.
  */
 import { useMemo, useRef } from 'react'
 import {
@@ -9,18 +15,23 @@ import {
   FileText,
   Lightbulb,
   ChartColumn,
-  AlertTriangle,
-  Info,
-  CheckCircle2,
 } from 'lucide-react'
 import { useData } from '../context/DataContext'
 import ChartRenderer from '../components/ChartRenderer'
 import EmptyState from '../components/EmptyState'
-import { exportDatasetCSV, downloadChartPNG, triggerPrint } from '../utils/exportUtils'
+import InsightCard from '../components/InsightCard'
+import {
+  exportDatasetCSV,
+  downloadChartPNG,
+  triggerPrint,
+} from '../utils/exportUtils'
+import * as exportUtilsNS from '../utils/exportUtils'
 import { useToast } from '../components/Toast'
 import { analyzeQuality } from '../utils/cleaning'
+import { buildReportData } from '../utils/reportBuilder'
 import { generateInsights } from '../utils/insights'
 import { describeColumn } from '../utils/statistics'
+import { computeKPIs } from '../utils/kpis'
 
 const sectionCls =
   'rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 print:shadow-none'
@@ -44,37 +55,82 @@ function Section({ icon: Icon, number, title, children }) {
   )
 }
 
-const KIND_STYLE = {
-  info: {
-    border: 'border-blue-200 dark:border-blue-900/60',
-    bg: 'bg-blue-50 dark:bg-blue-950/30',
-    icon: <Info size={16} className="mt-0.5 shrink-0 text-blue-600 dark:text-blue-400" />,
-    title: 'text-blue-900 dark:text-blue-100',
-    body: 'text-blue-800 dark:text-blue-200',
-  },
-  warning: {
-    border: 'border-amber-200 dark:border-amber-900/60',
-    bg: 'bg-amber-50 dark:bg-amber-950/30',
-    icon: <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />,
-    title: 'text-amber-900 dark:text-amber-100',
-    body: 'text-amber-800 dark:text-amber-200',
-  },
-  success: {
-    border: 'border-emerald-200 dark:border-emerald-900/60',
-    bg: 'bg-emerald-50 dark:bg-emerald-950/30',
-    icon: <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" />,
-    title: 'text-emerald-900 dark:text-emerald-100',
-    body: 'text-emerald-800 dark:text-emerald-200',
-  },
+const fmtMoneyCell = (v) =>
+  v === null || v === undefined || Number.isNaN(v)
+    ? '—'
+    : '$' +
+      Number(v.toFixed(2)).toLocaleString('en-US', { maximumFractionDigits: 2 })
+const fmtIntCell = (v) =>
+  v === null || v === undefined || Number.isNaN(v)
+    ? '—'
+    : Math.round(Number(v)).toLocaleString('en-US')
+const fmtDateCell = (v) => {
+  const d = new Date(v)
+  return Number.isNaN(+d)
+    ? String(v)
+    : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function asList(v) {
+  if (v === null || v === undefined) return []
+  if (Array.isArray(v)) return v.filter((x) => x !== null && x !== undefined).map(String)
+  if (typeof v === 'object')
+    return Object.entries(v).map(([k, val]) => `${k}: ${val === null || val === undefined ? '—' : String(val)}`)
+  return [String(v)]
 }
 
 export default function Reports() {
-  const { dataset, savedCharts, setPage } = useData()
+  // dashboardFilters is added by a parallel worker — read defensively.
+  const { dataset, savedCharts, setPage, dashboardFilters } = useData()
   const toast = useToast()
   const chartRefs = useRef({})
 
+  const filters = dashboardFilters ?? {}
+
   const quality = useMemo(() => (dataset ? analyzeQuality(dataset) : null), [dataset])
   const insights = useMemo(() => (dataset ? generateInsights(dataset) : []), [dataset])
+  const kpis = useMemo(() => {
+    if (!dataset) return null
+    try {
+      return computeKPIs(dataset, { filters })
+    } catch {
+      return null
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataset, dashboardFilters])
+
+  const analysisPeriod = useMemo(() => {
+    if (!dataset) return null
+    const dateCol = dataset.columns.find((c) => c.type === 'date')
+    if (!dateCol) return null
+    const dates = dataset.rows
+      .map((r) => r[dateCol.name])
+      .filter((v) => v !== null && v !== undefined && String(v).trim() !== '')
+      .map(String)
+      .sort()
+    if (dates.length === 0) return null
+    return `${fmtDateCell(dates[0])} → ${fmtDateCell(dates[dates.length - 1])}`
+  }, [dataset])
+
+  // Consolidated report builder (statically imported; module is part of the build).
+  const consolidated = useMemo(() => {
+    if (!dataset) return null
+    try {
+      return (
+        buildReportData({
+          dataset,
+          kpis,
+          quality,
+          insights,
+          filters,
+          savedCharts,
+        }) || null
+      )
+    } catch {
+      return null
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [buildReportData, dataset, kpis, quality, insights, dashboardFilters, savedCharts])
 
   if (!dataset) {
     return (
@@ -184,6 +240,106 @@ export default function Reports() {
     }
   }
 
+  // Optional Worker-C export helpers — buttons only render when present.
+  const canExportKPI = typeof exportUtilsNS.exportKPISummaryCSV === 'function'
+  const canExportDQ = typeof exportUtilsNS.exportDQReportCSV === 'function'
+
+  const exportKPISummary = () => {
+    try {
+      exportUtilsNS.exportKPISummaryCSV(kpis, dataset.name)
+      toast.success('KPI summary exported to CSV.')
+    } catch (e) {
+      toast.error(`KPI export failed: ${e && e.message ? e.message : e}`)
+    }
+  }
+
+  const exportDQReport = () => {
+    try {
+      // auditLog lives on dataset.meta once the Data Quality page records it.
+      const auditLog =
+        dataset.meta && Array.isArray(dataset.meta.auditLog) ? dataset.meta.auditLog : []
+      exportUtilsNS.exportDQReportCSV(dataset.name, quality, auditLog)
+      toast.success('Data-quality report exported to CSV.')
+    } catch (e) {
+      toast.error(`Quality export failed: ${e && e.message ? e.message : e}`)
+    }
+  }
+
+  /* ---------------- Consolidated report (optional) ---------------- */
+  const reportName = (consolidated && consolidated.datasetName) || dataset.name || '—'
+  const reportGeneratedAt = (() => {
+    const g = consolidated && consolidated.generatedAt
+    if (!g) return generatedAt
+    const d = new Date(g)
+    return Number.isNaN(+d)
+      ? String(g)
+      : d.toLocaleString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+        })
+  })()
+  const reportPeriod = (() => {
+    const ap = consolidated && consolidated.analysisPeriod
+    if (ap && typeof ap === 'object') {
+      if (ap.from && ap.to) return `${fmtDateCell(ap.from)} → ${fmtDateCell(ap.to)}`
+      return '—'
+    }
+    return ap || analysisPeriod || '—'
+  })()
+  const reportFilters =
+    (consolidated && consolidated.filters !== undefined && consolidated.filters !== null
+      ? consolidated.filters
+      : filters) || {}
+  const filterEntries =
+    reportFilters && typeof reportFilters === 'object'
+      ? Object.entries(reportFilters).filter(([, v]) => v !== null && v !== undefined && v !== '')
+      : []
+  const reportKpis = (consolidated && consolidated.kpis) || kpis
+  const kpiTableRows = reportKpis
+    ? [
+        ['Total revenue', fmtMoneyCell(reportKpis.totalRevenue)],
+        ['Total orders', fmtIntCell(reportKpis.totalOrders)],
+        ['Units sold', fmtIntCell(reportKpis.unitsSold)],
+        ['Average order value', fmtMoneyCell(reportKpis.avgOrderValue)],
+        [
+          'Revenue growth (MoM)',
+          reportKpis.revenueGrowthPct === null || reportKpis.revenueGrowthPct === undefined
+            ? reportKpis.growthNote || '—'
+            : `${reportKpis.revenueGrowthPct >= 0 ? '+' : ''}${Number(reportKpis.revenueGrowthPct).toFixed(1)}%`,
+        ],
+        [
+          'Data completeness',
+          reportKpis.dataCompleteness === null || reportKpis.dataCompleteness === undefined
+            ? '—'
+            : `${Number(reportKpis.dataCompleteness).toFixed(1)}%`,
+        ],
+      ]
+    : []
+  const reportQuality =
+    (consolidated && consolidated.qualitySummary) ||
+    qualityFindings.map((f) => f.text)
+  const reportInsights = (consolidated && consolidated.insights) || insights
+  const reportChartSummaries =
+    (consolidated && consolidated.chartSummaries) ||
+    savedCharts.map((c) => ({
+      title: c.title || 'Untitled chart',
+      type: c.type || c.chartType || 'chart',
+    }))
+  const reportLimitations =
+    (consolidated && consolidated.limitations) ||
+    (reportKpis && reportKpis.warnings) ||
+    []
+  const reportAssumptions =
+    (consolidated && consolidated.assumptions) ||
+    (reportKpis && reportKpis.assumptions) ||
+    []
+
+  const toolbarBtnCls =
+    'flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-indigo-400 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-indigo-500 dark:hover:text-indigo-400'
+
   return (
     <div className="space-y-6">
       {/* Toolbar — hidden when printing */}
@@ -196,10 +352,22 @@ export default function Reports() {
           <Download size={15} />
           Export full dataset (CSV)
         </button>
+        {canExportKPI && (
+          <button type="button" onClick={exportKPISummary} className={toolbarBtnCls}>
+            <Download size={15} />
+            Export KPI summary (CSV)
+          </button>
+        )}
+        {canExportDQ && (
+          <button type="button" onClick={exportDQReport} className={toolbarBtnCls}>
+            <Download size={15} />
+            Export quality report (CSV)
+          </button>
+        )}
         <button
           type="button"
           onClick={triggerPrint}
-          className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-indigo-400 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-indigo-500 dark:hover:text-indigo-400"
+          className={toolbarBtnCls}
         >
           <Printer size={15} />
           Print / Save as PDF
@@ -289,27 +457,18 @@ export default function Reports() {
         </Section>
 
         <Section icon={Lightbulb} number="4" title="Key insights">
+          <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
+            Automatically generated by rule-based checks — no AI involved.
+          </p>
           {insights.length === 0 ? (
             <p className="text-sm text-slate-500 dark:text-slate-400">
               No automatic insights were generated for this dataset.
             </p>
           ) : (
             <div className="space-y-3">
-              {insights.map((ins) => {
-                const style = KIND_STYLE[ins.kind] || KIND_STYLE.info
-                return (
-                  <div
-                    key={ins.id}
-                    className={`flex items-start gap-2.5 rounded-lg border p-3.5 ${style.border} ${style.bg}`}
-                  >
-                    {style.icon}
-                    <div>
-                      <p className={`text-sm font-semibold ${style.title}`}>{ins.title}</p>
-                      <p className={`mt-0.5 text-sm ${style.body}`}>{ins.body}</p>
-                    </div>
-                  </div>
-                )
-              })}
+              {insights.map((ins) => (
+                <InsightCard key={ins.id} insight={ins} />
+              ))}
             </div>
           )}
         </Section>
@@ -364,6 +523,129 @@ export default function Reports() {
             </div>
           )}
         </Section>
+
+        {consolidated && (
+          <Section icon={FileText} number="6" title="Consolidated report">
+            <div className="space-y-5 text-sm">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+                  {reportName}
+                </h3>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                  Generated {reportGeneratedAt}
+                  {reportPeriod !== '—' && ` · Analysis period: ${reportPeriod}`}
+                </p>
+              </div>
+
+              <div>
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Applied filters
+                </h4>
+                {filterEntries.length === 0 ? (
+                  <p className="mt-1 text-slate-600 dark:text-slate-300">None — full dataset analyzed.</p>
+                ) : (
+                  <dl className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
+                    {filterEntries.map(([k, v]) => (
+                      <div key={k} className="flex gap-1.5">
+                        <dt className="font-medium text-slate-700 dark:text-slate-300">{k}:</dt>
+                        <dd className="text-slate-600 dark:text-slate-400">{String(v)}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+              </div>
+
+              {kpiTableRows.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    KPI summary
+                  </h4>
+                  <table className="mt-1 w-full max-w-xl text-left text-sm">
+                    <tbody>
+                      {kpiTableRows.map(([k, v]) => (
+                        <tr key={k} className={metaRowCls}>
+                          <td className="py-1.5 pr-4 font-medium text-slate-800 dark:text-slate-200">
+                            {k}
+                          </td>
+                          <td className="py-1.5 font-mono text-slate-600 dark:text-slate-300">
+                            {v}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <div>
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Data quality summary
+                </h4>
+                <ul className="mt-1 list-disc space-y-1 pl-5 text-slate-700 dark:text-slate-200">
+                  {asList(reportQuality).map((t, i) => (
+                    <li key={i}>{t}</li>
+                  ))}
+                </ul>
+              </div>
+
+              <div>
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Insights
+                </h4>
+                <div className="mt-2 space-y-3">
+                  {reportInsights.map((ins) => (
+                    <InsightCard key={ins.id || ins.title} insight={ins} />
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Chart summaries
+                </h4>
+                {reportChartSummaries.length === 0 ? (
+                  <p className="mt-1 text-slate-600 dark:text-slate-300">
+                    No charts saved for this dataset.
+                  </p>
+                ) : (
+                  <ul className="mt-1 list-disc space-y-1 pl-5 text-slate-700 dark:text-slate-200">
+                    {reportChartSummaries.map((c, i) => (
+                      <li key={i}>
+                        {typeof c === 'string' ? c : `${c.title || 'Untitled chart'} (${c.type || 'chart'})`}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              {asList(reportAssumptions).length > 0 && (
+                <div>
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Assumptions
+                  </h4>
+                  <ul className="mt-1 list-disc space-y-1 pl-5 text-slate-700 dark:text-slate-200">
+                    {asList(reportAssumptions).map((t, i) => (
+                      <li key={i}>{t}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {asList(reportLimitations).length > 0 && (
+                <div>
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Limitations
+                  </h4>
+                  <ul className="mt-1 list-disc space-y-1 pl-5 text-slate-700 dark:text-slate-200">
+                    {asList(reportLimitations).map((t, i) => (
+                      <li key={i}>{t}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </Section>
+        )}
       </div>
     </div>
   )

@@ -48,6 +48,24 @@ function readJSON(key, fallback) {
 const DataContext = createContext(null)
 
 export function DataProvider({ children }) {
+  // ---- Dashboard business filters ----------------------------------------
+  // Stored in context (not Dashboard-local state) so other pages such as
+  // Reports can read the active dashboard filters later. Replace semantics:
+  // pass the full next filter object; pass {} to clear all filters.
+  // Keys: { dateFrom, dateTo, region, category, channel, segment }.
+  const [dashboardFilters, setDashboardFiltersState] = useState({})
+
+  /**
+   * Replace the dashboard filter object. Values reference the *values* of
+   * the dataset's semantic columns (detected in Dashboard.jsx); Dashboard
+   * maps each key to the detected column for the active dataset.
+   */
+  const setDashboardFilters = useCallback((next) => {
+    setDashboardFiltersState(
+      next && typeof next === 'object' ? { ...next } : {},
+    )
+  }, [])
+
   // ---- Dataset -----------------------------------------------------------
   const [dataset, setDatasetState] = useState(null)
   const [originalDataset, setOriginalDataset] = useState(null)
@@ -56,6 +74,8 @@ export function DataProvider({ children }) {
   const setDataset = useCallback((ds) => {
     setDatasetState(ds ?? null)
     setOriginalDataset(ds ?? null)
+    // A new dataset has different columns/values, so stale filters must go.
+    setDashboardFiltersState({})
   }, [])
 
   /**
@@ -276,6 +296,7 @@ export function DataProvider({ children }) {
     await clearStoredDataset()
     setSavedCharts([])
     setPrefs(DEFAULT_PREFS)
+    setDashboardFiltersState({})
     setPersistenceStatus({
       prefs: OK_PERSISTENCE,
       charts: IDLE_PERSISTENCE,
@@ -300,6 +321,8 @@ export function DataProvider({ children }) {
       toggleSidebar,
       page,
       setPage,
+      dashboardFilters,
+      setDashboardFilters,
       savedCharts,
       addChart,
       updateChart,
@@ -325,6 +348,8 @@ export function DataProvider({ children }) {
       addChart,
       updateChart,
       deleteChart,
+      dashboardFilters,
+      setDashboardFilters,
       prefs,
       updatePrefs,
       persistenceStatus,

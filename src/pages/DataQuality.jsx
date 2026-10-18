@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   BrushCleaning,
+  Download,
   Eye,
   RotateCcw,
   Undo2,
@@ -19,8 +20,10 @@ import {
 import { useData } from '../context/DataContext';
 import { useToast } from '../components/Toast';
 import ConfirmDialog from '../components/ConfirmDialog';
-import { isMissing } from '../utils/dataTypes';
+import { isMissing, inferColumns } from '../utils/dataTypes';
+import { exportDQReportCSV } from '../utils/exportUtils';
 import {
+  analyzeQuality,
   removeDuplicates,
   dropRowsWithMissing,
   fillNumeric,
@@ -50,6 +53,79 @@ const OPERATIONS = [
 ];
 
 const TARGET_TYPES = ['numeric', 'date', 'string'];
+
+/**
+ * Plain-language notes on how each operation can change analytical results.
+ * Recorded on every history entry so cleaning is never silent.
+ */
+const IMPACT_NOTES = {
+  'remove-duplicates':
+    'Removing duplicates lowers row counts and can shift totals and averages — recorded here so results stay reproducible.',
+  'drop-missing':
+    'Dropping rows with missing values shrinks the sample and can bias results if the missingness is not random.',
+  'fill-numeric':
+    'Replacing missing values with the mean shrinks variance and can bias averages — documented here for reproducibility.',
+  'fill-categorical':
+    'Filling missing categories with a fixed value concentrates that value and can skew distributions.',
+  'trim-whitespace':
+    'Trimming whitespace only changes text spacing; numeric results are unaffected, but category groupings may merge.',
+  'convert-type':
+    'Changing column types alters how values aggregate (e.g. text → number); cells that could not be converted were left unchanged.',
+  'rename-column':
+    'Renaming a column does not change any values; downstream references must use the new name.',
+  'remove-column':
+    'Removing a column deletes it from every row; any analysis that used it is no longer possible.',
+};
+
+/**
+ * Compress an analyzeQuality() result to the four headline numbers stored
+ * on each audit entry. missingPct is the share of missing cells over the
+ * whole table (rows × columns).
+ */
+function qualitySnapshot(quality, rowCount, colCount) {
+  const byCol = Array.isArray(quality?.missingByColumn)
+    ? quality.missingByColumn
+    : [];
+  const missingCells = byCol.reduce((a, c) => a + (c.missing || 0), 0);
+  const totalCells = (rowCount || 0) * (colCount || 0);
+  return {
+    missingPct:
+      totalCells > 0
+        ? Math.round(((missingCells / totalCells) * 100 + Number.EPSILON) * 100) /
+          100
+        : 0,
+    duplicateRows: quality?.duplicateRows ?? 0,
+    invalidNumericCount: (quality?.invalidNumeric || []).reduce(
+      (a, d) => a + (d.count || 0),
+      0
+    ),
+    outlierCount: (quality?.outliers || []).reduce(
+      (a, o) => a + (o.count || 0),
+      0
+    ),
+  };
+}
+
+/** Column names affected by an operation (for the audit log). */
+function affectedColumns(op, dataset, params) {
+  const all = dataset.columns.map((c) => c.name);
+  switch (op) {
+    case 'drop-missing':
+      return params.dropColumns.length > 0 ? params.dropColumns : all;
+    case 'fill-numeric':
+    case 'fill-categorical':
+    case 'convert-type':
+    case 'remove-column':
+      return params.column ? [params.column] : [];
+    case 'rename-column':
+      return params.column
+        ? [`${params.column} → ${String(params.newName).trim()}`]
+        : [];
+    default:
+      // remove-duplicates and trim-whitespace scan every row/column.
+      return all;
+  }
+}
 
 /** Validate preconditions, then run the op. Throws Error on invalid input. */
 function runOperation(op, dataset, params) {
@@ -297,13 +373,40 @@ export default function DataQuality() {
     if (!preview || applying) return;
     const opLabel = OPERATIONS.find((o) => o.value === op)?.label || op;
     // Snapshot before the deferred run; the user can't change inputs while
-    // the apply button is disabled.
+    // the apply button is disabled. Params are captured now because the
+    // drop-column selection is cleared after a successful apply.
     const detail = preview.detail;
     const resultRows = preview.resultRows;
     const beforeRows = dataset.rows;
+    const opParams = { column, newName, method, fillValue, targetType, dropColumns };
     setApplying(true);
     setTimeout(() => {
       try {
+        // Audit snapshots: headline quality numbers before and after this
+        // step. analyzeQuality is pure and O(rows × columns) — cheap enough
+        // to run twice per explicit user-confirmed apply.
+        const beforeDs = {
+          name: dataset.name,
+          columns: dataset.columns,
+          rows: beforeRows,
+          meta: dataset.meta,
+        };
+        const qualityBefore = qualitySnapshot(
+          analyzeQuality(beforeDs),
+          beforeRows.length,
+          dataset.columns.length
+        );
+        const afterColumns = inferColumns(resultRows);
+        const qualityAfter = qualitySnapshot(
+          analyzeQuality({
+            name: dataset.name,
+            columns: afterColumns,
+            rows: resultRows,
+            meta: dataset.meta,
+          }),
+          resultRows.length,
+          afterColumns.length
+        );
         const entry = {
           id: `step-${Date.now().toString(36)}`,
           label: opLabel,
@@ -312,6 +415,15 @@ export default function DataQuality() {
           // Pre-step snapshot: pure ops never mutate, so this reference stays
           // a faithful, recoverable copy of the data before the step.
           beforeRows,
+          // Audit fields — nothing is ever applied silently.
+          op,
+          columns: affectedColumns(op, dataset, opParams),
+          rowsBefore: beforeRows.length,
+          rowsAfter: resultRows.length,
+          rowsAffected: preview.changed,
+          qualityBefore,
+          qualityAfter,
+          impactNote: IMPACT_NOTES[op] || '',
         };
         setHistory((h) => [...h, entry]);
         updateDataset(resultRows, `${opLabel}: ${detail}`);
@@ -366,6 +478,17 @@ export default function DataQuality() {
     toast.success('Original dataset restored. All cleaning steps discarded.');
   };
 
+  /** Export the full quality report (current metrics + audit log) as CSV. */
+  const handleExportDQReport = () => {
+    if (!dataset) return;
+    try {
+      exportDQReportCSV(dataset.name, analyzeQuality(dataset), history);
+      toast.success('Quality report exported as CSV.');
+    } catch (e) {
+      toast.error(`Export failed: ${e?.message || e}`);
+    }
+  };
+
   // Dataset differs from original once a cleaning op has been applied
   // (updateDataset builds a new object; resetDataset restores the reference).
   const isDirty = !!dataset && !!originalDataset && dataset !== originalDataset;
@@ -416,7 +539,7 @@ export default function DataQuality() {
                     </option>
                   ))}
                 </select>
-              </div>
+          </div>
 
               {op === 'fill-numeric' && (
                 <>
@@ -659,7 +782,8 @@ export default function DataQuality() {
               </p>
             )}
 
-            <div className="mt-4 flex flex-wrap gap-2">
+            {/* Toolbar: interactive controls are hidden when printing. */}
+            <div className="no-print mt-4 flex flex-wrap gap-2">
               <button
                 onClick={handlePreview}
                 disabled={!canRun}
@@ -834,6 +958,106 @@ export default function DataQuality() {
                     </li>
                   ))}
                 </ol>
+              </div>
+            )}
+
+            {/* Audit log: plain-language record of every cleaning step, with
+                before/after quality numbers so nothing is applied silently. */}
+            {history.length > 0 && (
+              <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950/60">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="flex items-center gap-1.5 text-sm font-semibold text-slate-900 dark:text-white">
+                    <History size={15} />
+                    Audit log ({history.length})
+                  </h3>
+                  <button
+                    onClick={handleExportDQReport}
+                    className="no-print inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-white dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+                  >
+                    <Download size={14} />
+                    Export quality report (CSV)
+                  </button>
+                </div>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                  Each entry records what changed and how the headline quality
+                  metrics moved, plus a plain-language note on how the step can
+                  affect analytical results.
+                </p>
+                <div className="mt-2 overflow-x-auto rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+                  <table className="w-full border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-50 text-left dark:border-slate-800 dark:bg-slate-950/60">
+                        <th className="whitespace-nowrap px-2 py-1.5 font-semibold text-slate-600 dark:text-slate-300">
+                          Time
+                        </th>
+                        <th className="px-2 py-1.5 font-semibold text-slate-600 dark:text-slate-300">
+                          Operation
+                        </th>
+                        <th className="px-2 py-1.5 font-semibold text-slate-600 dark:text-slate-300">
+                          Column(s)
+                        </th>
+                        <th className="whitespace-nowrap px-2 py-1.5 font-semibold text-slate-600 dark:text-slate-300">
+                          Rows affected
+                        </th>
+                        <th className="whitespace-nowrap px-2 py-1.5 font-semibold text-slate-600 dark:text-slate-300">
+                          Missing %
+                        </th>
+                        <th className="whitespace-nowrap px-2 py-1.5 font-semibold text-slate-600 dark:text-slate-300">
+                          Duplicates
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {history.map((entry) => {
+                        const cols = Array.isArray(entry.columns)
+                          ? entry.columns
+                          : [];
+                        const qb = entry.qualityBefore || {};
+                        const qa = entry.qualityAfter || {};
+                        const fmt = (v) =>
+                          typeof v === 'number'
+                            ? v.toLocaleString(undefined, {
+                                maximumFractionDigits: 2,
+                              })
+                            : '—';
+                        return (
+                          <tr
+                            key={entry.id}
+                            className="border-b border-slate-100 align-top last:border-0 dark:border-slate-800/60"
+                          >
+                            <td className="whitespace-nowrap px-2 py-1.5 text-slate-500 dark:text-slate-400">
+                              {entry.at
+                                ? new Date(entry.at).toLocaleString()
+                                : '—'}
+                            </td>
+                            <td className="max-w-[320px] px-2 py-1.5">
+                              <p className="font-medium text-slate-800 dark:text-slate-200">
+                                {entry.label}
+                              </p>
+                              {entry.impactNote && (
+                                <p className="mt-0.5 text-slate-500 italic dark:text-slate-400">
+                                  {entry.impactNote}
+                                </p>
+                              )}
+                            </td>
+                            <td className="max-w-[200px] truncate px-2 py-1.5 text-slate-700 dark:text-slate-300">
+                              {cols.join(', ') || '—'}
+                            </td>
+                            <td className="px-2 py-1.5 text-slate-700 dark:text-slate-300">
+                              {(entry.rowsAffected ?? 0).toLocaleString()}
+                            </td>
+                            <td className="whitespace-nowrap px-2 py-1.5 text-slate-700 dark:text-slate-300">
+                              {fmt(qb.missingPct)}% → {fmt(qa.missingPct)}%
+                            </td>
+                            <td className="whitespace-nowrap px-2 py-1.5 text-slate-700 dark:text-slate-300">
+                              {fmt(qb.duplicateRows)} → {fmt(qa.duplicateRows)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>

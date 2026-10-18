@@ -1,0 +1,301 @@
+order_id,order_date,region,category,product,quantity,unit_price,revenue,channel,customer_segment
+ORD-0001,2025-09-02,North,Sports,Tennis Racket,3,428,1284,Online,Corporate
+ORD-0002,2025-11-18,East,Books,Textbook,3,21,63,Online,Corporate
+ORD-0003,2025-06-21,West,Sports,Yoga Mat,4,13.88,55.52,Retail,Consumer
+ORD-0004,2025-10-13,East,Clothing,T-Shirt,1,36,36,Online,Home Office
+ORD-0005,2025-06-14,North,Home & Kitchen,Blender,5,106.05,530.25,Retail,Corporate
+ORD-0006,2025-04-21,East,Clothing,Sneakers,4,39.33,157.32,Retail,Consumer
+ORD-0007,2025-08-29,East,Clothing,Jacket,2,20.46,40.92,Wholesale,Consumer
+ORD-0008,2025-02-20,North,Books,Fiction Novel,3,57,171,Retail,Corporate
+ORD-0009,2025-09-20,West,Sports,Dumbbells,5,49.86,249.3,Wholesale,Consumer
+ORD-0010,2025-12-30,East,Home & Kitchen,Lamp,5,49.37,246.85,Retail,Corporate
+ORD-0011,2025-09-24,South,Clothing,Jeans,3,55.21,165.63,Wholesale,Home Office
+ORD-0012,2025-07-19,South,Books,Fiction Novel,5,30.46,152.3,Wholesale,Consumer
+ORD-0013,2025-06-23,West,Sports,Yoga Mat,5,57.7,288.5,Wholesale,Consumer
+ORD-0014,2025-05-31,North,Sports,Tennis Racket,4,120.91,483.64,Retail,Consumer
+ORD-0015,2025-10-17,South,Sports,Yoga Mat,5,171.27,856.35,Wholesale,Corporate
+ORD-0016,2025-11-16,West,Electronics,Smartphone,4,771.43,3085.72,Retail,Corporate
+ORD-0017,2025-09-16,South,Electronics,Laptop,1,854.02,854.02,Retail,Consumer
+ORD-0018,2025-12-27,North,Clothing,T-Shirt,5,90.13,450.65,Retail,Consumer
+ORD-0019,2025-09-08,South,Clothing,Jeans,3,68.57,205.71,Wholesale,Consumer
+ORD-0020,2025-08-04,North,Home & Kitchen,Coffee Maker,4,170.71,682.84,Online,Consumer
+ORD-0021,2025-09-11,South,Sports,Yoga Mat,2,94.62,189.24,Online,Consumer
+ORD-0022,2025-05-19,East,Home & Kitchen,Lamp,2,152.24,304.48,Wholesale,Corporate
+ORD-0023,2025-11-03,West,Electronics,Laptop,5,642.67,3213.35,Online,Corporate
+ORD-0024,2025-07-19,West,Books,Textbook,2,28.26,56.52,Wholesale,Home Office
+ORD-0025,2025-03-03,East,Sports,Tennis Racket,1,45.84,45.84,Wholesale,Home Office
+ORD-0026,2025-11-08,East,Books,Textbook,4,51.52,206.08,Retail,Home Office
+ORD-0027,2025-08-17,South,Sports,Bicycle,2,469.52,939.04,Online,Corporate
+ORD-0028,2025-09-23,West,Electronics,Tablet,1,786,786,Retail,Home Office
+ORD-0029,2025-01-18,South,Electronics,Laptop,2,188.49,376.98,Retail,Home Office
+ORD-0030,2025-09-01,East,Sports,Dumbbells,4,107.61,430.44,Retail,Corporate
+ORD-0031,2025-02-23,East,Home & Kitchen,Coffee Maker,2,102.66,205.32,Retail,Corporate
+ORD-0032,2025-01-02,North,Sports,Bicycle,3,77.79,233.37,Online,Home Office
+ORD-0033,2025-10-27,North,Home & Kitchen,Coffee Maker,3,43.16,129.48,Online,Home Office
+ORD-0034,2025-10-01,East,Home & Kitchen,Lamp,1,290.42,290.42,Retail,Home Office
+ORD-0035,2025-02-04,North,Home & Kitchen,Coffee Maker,1,37.25,37.25,Wholesale,Home Office
+ORD-0036,2025-05-25,South,Home & Kitchen,Coffee Maker,5,21.31,106.55,Wholesale,Corporate
+ORD-0037,2025-04-08,East,Clothing,Sneakers,5,143.29,716.45,Wholesale,Home Office
+ORD-0038,2025-06-30,West,Home & Kitchen,Cookware Set,5,103.91,519.55,Wholesale,Corporate
+ORD-0039,2025-10-07,South,Home & Kitchen,Cookware Set,5,295.53,1477.65,Wholesale,Home Office
+ORD-0040,2025-11-18,South,Clothing,Jeans,5,54.37,271.85,Retail,Home Office
+ORD-0041,2025-02-25,South,Sports,Bicycle,5,349.46,1747.3,Retail,Consumer
+ORD-0042,2025-09-18,North,Sports,Bicycle,4,372.29,1489.16,Wholesale,Corporate
+ORD-0043,2025-11-23,East,Home & Kitchen,Coffee Maker,1,157.47,157.47,Retail,Corporate
+ORD-0044,2025-03-03,North,Sports,Yoga Mat,3,33.14,99.42,Retail,Home Office
+ORD-0045,2025-01-12,South,Books,Cookbook,4,12.41,49.64,Online,Home Office
+ORD-0046,2025-05-06,North,Sports,Tennis Racket,5,445.41,2227.05,Online,Corporate
+ORD-0047,2025-07-09,South,Clothing,Jacket,2,110.86,221.72,Online,Home Office
+ORD-0048,2025-01-22,North,Sports,Dumbbells,5,68.9,344.5,Online,Consumer
+ORD-0049,2025-05-05,East,Books,Fiction Novel,3,51.68,155.04,Wholesale,Home Office
+ORD-0050,2025-07-04,North,Clothing,T-Shirt,2,119.97,239.94,Wholesale,Corporate
+ORD-0051,2025-12-14,North,Books,Fiction Novel,4,33.66,134.64,Retail,Home Office
+ORD-0052,2025-02-19,East,Clothing,Jacket,4,43.78,175.12,Retail,Consumer
+ORD-0053,2025-01-19,West,Books,Cookbook,3,46.75,140.25,Online,Consumer
+ORD-0054,2025-04-02,West,Clothing,Jeans,4,116.54,466.16,Online,Corporate
+ORD-0055,2025-02-01,North,Home & Kitchen,Lamp,1,257.96,257.96,Online,Corporate
+ORD-0056,2025-09-04,North,Home & Kitchen,Lamp,4,153.09,612.36,Wholesale,Corporate
+ORD-0057,2025-06-12,South,Clothing,Jeans,3,116.71,350.13,Retail,Consumer
+ORD-0058,2025-04-02,East,Books,Fiction Novel,2,30.15,60.3,Retail,Consumer
+ORD-0059,2025-10-23,North,Books,Cookbook,4,42.21,168.84,Retail,Corporate
+ORD-0060,2025-07-30,North,Home & Kitchen,Cookware Set,3,143.4,430.2,Online,Home Office
+ORD-0061,2025-12-06,South,Electronics,Headphones,2,877.78,1755.56,Wholesale,Corporate
+ORD-0062,2025-06-11,South,Electronics,Tablet,3,606.53,1819.59,Online,Home Office
+ORD-0063,2025-06-24,North,Home & Kitchen,Lamp,5,252.44,1262.2,Online,Corporate
+ORD-0064,2025-08-11,West,Home & Kitchen,Cookware Set,4,173.22,692.88,Wholesale,Home Office
+ORD-0065,2025-10-24,North,Books,Fiction Novel,5,57.79,288.95,Wholesale,Consumer
+ORD-0066,2025-10-11,South,Home & Kitchen,Lamp,5,208.57,1042.85,Retail,Home Office
+ORD-0067,2025-05-17,East,Sports,Yoga Mat,2,88.2,176.4,Online,Consumer
+ORD-0068,2025-12-22,South,Sports,Bicycle,2,322.09,644.18,Wholesale,Consumer
+ORD-0069,2025-08-05,West,Sports,Dumbbells,5,136.14,680.7,Retail,Home Office
+ORD-0070,2025-07-13,West,Sports,Yoga Mat,2,238.73,477.46,Retail,Consumer
+ORD-0071,2025-08-06,West,Sports,Dumbbells,4,223.68,894.72,Retail,Consumer
+ORD-0072,2025-09-16,East,Books,Cookbook,1,43.33,43.33,Retail,Home Office
+ORD-0073,2025-02-04,West,Sports,Yoga Mat,1,41.48,41.48,Online,Corporate
+ORD-0074,2025-01-01,South,Electronics,Tablet,4,769.99,3079.96,Retail,Consumer
+ORD-0075,2025-08-17,East,Sports,Bicycle,4,36.36,145.44,Retail,Corporate
+ORD-0076,2025-03-13,North,Home & Kitchen,Cookware Set,3,183.26,549.78,Wholesale,Consumer
+ORD-0077,2025-08-06,South,Books,Cookbook,5,30.41,152.05,Wholesale,Home Office
+ORD-0078,2025-07-05,West,Sports,Yoga Mat,2,455.7,911.4,Online,Consumer
+ORD-0079,2025-01-08,East,Books,Cookbook,3,58.75,176.25,Wholesale,Consumer
+ORD-0080,2025-04-22,East,Books,Textbook,2,57.18,114.36,Online,Consumer
+ORD-0081,2025-07-06,South,Books,Textbook,4,24.43,97.72,Online,Corporate
+ORD-0082,2025-11-21,East,Books,Biography,4,36.11,144.44,Retail,Corporate
+ORD-0083,2025-08-17,South,Home & Kitchen,Blender,3,203.18,609.54,Online,Home Office
+ORD-0084,2025-02-15,East,Clothing,Jeans,2,12.65,25.3,Online,Corporate
+ORD-0085,2025-03-20,South,Sports,Tennis Racket,1,357.69,357.69,Retail,Corporate
+ORD-0086,2025-01-31,North,Sports,Dumbbells,3,410.17,1230.51,Wholesale,Home Office
+ORD-0087,2025-08-30,East,Books,Biography,3,17.06,51.18,Wholesale,Corporate
+ORD-0088,2025-07-29,North,Clothing,T-Shirt,1,136.25,136.25,Wholesale,Consumer
+ORD-0089,2025-12-23,East,Home & Kitchen,Cookware Set,3,185.46,556.38,Retail,Home Office
+ORD-0090,2025-12-02,South,Books,Cookbook,1,19.71,19.71,Retail,Corporate
+ORD-0091,2025-08-24,West,Clothing,Sneakers,2,57.05,114.1,Online,Corporate
+ORD-0092,2025-07-28,South,Home & Kitchen,Lamp,3,222.72,668.16,Online,Corporate
+ORD-0093,2025-02-14,South,Electronics,Tablet,1,81.84,81.84,Retail,Corporate
+ORD-0094,2025-06-10,South,Clothing,Jacket,5,111.63,558.15,Online,Corporate
+ORD-0095,2025-05-18,North,Clothing,Sneakers,1,128.22,128.22,Online,Home Office
+ORD-0096,2025-11-16,North,Home & Kitchen,Lamp,1,191.6,191.6,Online,Home Office
+ORD-0097,2025-05-25,North,Home & Kitchen,Coffee Maker,3,20.97,62.91,Retail,Corporate
+ORD-0098,2025-03-25,North,Electronics,Smartphone,5,924.63,4623.15,Wholesale,Home Office
+ORD-0099,2025-03-31,East,Books,Cookbook,5,54.14,270.7,Wholesale,Consumer
+ORD-0100,2025-12-07,North,Electronics,Smartphone,5,1092,5460,Online,Home Office
+ORD-0101,2025-08-20,East,Sports,Bicycle,4,56.31,225.24,Online,Home Office
+ORD-0102,2025-01-29,South,Clothing,Sneakers,3,61.71,185.13,Wholesale,Corporate
+ORD-0103,2025-01-15,West,Clothing,Jeans,1,123.46,123.46,Wholesale,Home Office
+ORD-0104,2025-04-14,North,Sports,Tennis Racket,1,187.83,187.83,Retail,Corporate
+ORD-0105,2025-11-19,East,Sports,Tennis Racket,3,43.21,129.63,Retail,Home Office
+ORD-0106,2025-12-09,North,Clothing,T-Shirt,3,24.37,73.11,Retail,Corporate
+ORD-0107,2025-05-09,South,Home & Kitchen,Cookware Set,3,130.51,391.53,Online,Corporate
+ORD-0108,2025-11-08,South,Sports,Bicycle,4,440.48,1761.92,Online,Corporate
+ORD-0109,2025-12-24,West,Sports,Dumbbells,3,107,321,Wholesale,Home Office
+ORD-0110,2025-04-09,South,Electronics,Tablet,3,1042.02,3126.06,Retail,Home Office
+ORD-0111,2025-12-13,East,Clothing,Jeans,5,18.66,93.3,Online,Consumer
+ORD-0112,2025-01-11,East,Clothing,T-Shirt,2,39,78,Online,Consumer
+ORD-0113,2025-07-20,South,Sports,Dumbbells,1,369.87,369.87,Retail,Corporate
+ORD-0114,2025-09-27,East,Clothing,Jeans,4,132.17,528.68,Retail,Corporate
+ORD-0115,2025-05-31,South,Books,Cookbook,2,29.37,58.74,Retail,Consumer
+ORD-0116,2025-12-27,West,Sports,Bicycle,4,285.53,1142.12,Retail,Corporate
+ORD-0117,2025-01-23,East,Clothing,T-Shirt,5,45.28,226.4,Online,Home Office
+ORD-0118,2025-05-20,West,Electronics,Laptop,2,227.95,455.9,Wholesale,Home Office
+ORD-0119,2025-05-14,South,Books,Fiction Novel,2,50.88,101.76,Wholesale,Home Office
+ORD-0120,2025-08-13,East,Books,Textbook,3,21.13,63.39,Wholesale,Home Office
+ORD-0121,2025-11-30,South,Sports,Bicycle,4,262.06,1048.24,Wholesale,Consumer
+ORD-0122,2025-03-30,North,Books,Biography,4,51.43,205.72,Retail,Corporate
+ORD-0123,2025-07-15,North,Books,Textbook,3,27.07,81.21,Wholesale,Home Office
+ORD-0124,2025-02-01,West,Home & Kitchen,Coffee Maker,3,70.97,212.91,Online,Home Office
+ORD-0125,2025-03-17,North,Sports,Bicycle,2,160.62,321.24,Wholesale,Corporate
+ORD-0126,2025-07-30,South,Clothing,Jacket,4,34.52,138.08,Retail,Corporate
+ORD-0127,2025-03-21,East,Home & Kitchen,Lamp,3,203.09,609.27,Retail,Consumer
+ORD-0128,2025-02-06,East,Clothing,Sneakers,1,132.3,132.3,Online,Consumer
+ORD-0129,2025-06-23,North,Home & Kitchen,Cookware Set,1,240.7,240.7,Retail,Corporate
+ORD-0130,2025-01-01,West,Books,Biography,5,16.87,84.35,Retail,Consumer
+ORD-0131,2025-06-18,North,Clothing,Jeans,2,122.92,245.84,Retail,Home Office
+ORD-0132,2025-11-10,West,Sports,Tennis Racket,5,252.89,1264.45,Wholesale,Corporate
+ORD-0133,2025-08-16,South,Electronics,Tablet,1,620.16,620.16,Wholesale,Home Office
+ORD-0134,2025-01-26,South,Books,Cookbook,2,49.37,98.74,Retail,Home Office
+ORD-0135,2025-12-29,West,Sports,Bicycle,4,408.23,1632.92,Retail,Home Office
+ORD-0136,2025-05-15,North,Clothing,Jacket,3,15.86,47.58,Online,Home Office
+ORD-0137,2025-01-08,North,Clothing,T-Shirt,4,51.65,206.6,Wholesale,Home Office
+ORD-0138,2025-09-29,North,Clothing,Jeans,2,135.74,271.48,Online,Corporate
+ORD-0139,2025-11-02,East,Books,Cookbook,4,49.71,198.84,Online,Consumer
+ORD-0140,2025-02-27,East,Home & Kitchen,Lamp,2,288.53,577.06,Retail,Home Office
+ORD-0141,2025-03-14,East,Books,Biography,4,17.56,70.24,Retail,Home Office
+ORD-0142,2025-05-22,North,Electronics,Headphones,1,748.97,748.97,Wholesale,Consumer
+ORD-0143,2025-03-30,West,Electronics,Tablet,1,253.04,253.04,Retail,Corporate
+ORD-0144,2025-04-06,East,Clothing,Jeans,3,42.03,126.09,Retail,Home Office
+ORD-0145,2025-07-06,East,Home & Kitchen,Blender,1,270.03,270.03,Online,Corporate
+ORD-0146,2025-03-21,South,Books,Textbook,2,20.11,40.22,Retail,Corporate
+ORD-0147,2025-09-29,North,Home & Kitchen,Blender,1,156.15,156.15,Online,Consumer
+ORD-0148,2025-08-18,South,Home & Kitchen,Cookware Set,5,265.2,1326,Online,Home Office
+ORD-0149,2025-07-08,East,Electronics,Laptop,4,994.08,3976.32,Retail,Corporate
+ORD-0150,2025-05-16,South,Clothing,T-Shirt,3,41.77,125.31,Retail,Corporate
+ORD-0151,2025-03-30,West,Clothing,T-Shirt,2,54.79,109.58,Retail,Home Office
+ORD-0152,2025-07-25,North,Sports,Yoga Mat,3,55.04,165.12,Wholesale,Consumer
+ORD-0153,2025-07-28,South,Home & Kitchen,Lamp,3,234.2,702.6,Retail,Corporate
+ORD-0154,2025-12-07,West,Clothing,Sneakers,4,140,560,Retail,Consumer
+ORD-0155,2025-09-18,South,Electronics,Headphones,1,1096.37,1096.37,Online,Corporate
+ORD-0156,2025-12-30,West,Books,Cookbook,2,29.64,59.28,Online,Corporate
+ORD-0157,2025-01-20,South,Books,Textbook,2,13.55,27.1,Wholesale,Home Office
+ORD-0158,2025-05-03,East,Sports,Dumbbells,1,467.8,467.8,Retail,Home Office
+ORD-0159,2025-03-07,North,Sports,Dumbbells,5,166.3,831.5,Online,Home Office
+ORD-0160,2025-08-20,East,Home & Kitchen,Coffee Maker,4,279.55,1118.2,Online,Consumer
+ORD-0161,2025-01-17,North,Electronics,Laptop,4,99.22,396.88,Retail,Corporate
+ORD-0162,2025-06-25,South,Electronics,Laptop,4,1156.37,4625.48,Online,Home Office
+ORD-0163,2025-01-30,North,Home & Kitchen,Blender,1,60.86,60.86,Wholesale,Home Office
+ORD-0164,2025-10-03,North,Clothing,T-Shirt,2,66.73,133.46,Retail,Home Office
+ORD-0165,2025-12-19,East,Home & Kitchen,Lamp,1,43.95,43.95,Retail,Corporate
+ORD-0166,2025-09-02,North,Home & Kitchen,Lamp,1,242.11,242.11,Wholesale,Corporate
+ORD-0167,2025-03-19,North,Home & Kitchen,Cookware Set,2,214.27,428.54,Wholesale,Corporate
+ORD-0168,2025-05-12,South,Books,Textbook,1,55.09,55.09,Retail,Corporate
+ORD-0169,2025-01-16,North,Books,Fiction Novel,4,31.55,126.2,Wholesale,Corporate
+ORD-0170,2025-09-27,South,Electronics,Headphones,4,902.49,3609.96,Wholesale,Home Office
+ORD-0171,2025-07-06,West,Electronics,Tablet,4,530.87,2123.48,Retail,Consumer
+ORD-0172,2025-12-16,East,Home & Kitchen,Lamp,1,266.87,266.87,Online,Consumer
+ORD-0173,2025-02-27,East,Sports,Yoga Mat,3,60.4,181.2,Wholesale,Home Office
+ORD-0174,2025-06-14,South,Home & Kitchen,Coffee Maker,2,147.76,295.52,Online,Consumer
+ORD-0175,2025-01-27,North,Books,Biography,1,32.47,32.47,Retail,Corporate
+ORD-0176,2025-09-29,East,Sports,Dumbbells,5,210.08,1050.4,Online,Consumer
+ORD-0177,2025-10-06,East,Electronics,Laptop,5,940.29,4701.45,Online,Corporate
+ORD-0178,2025-12-07,North,Sports,Dumbbells,1,472.32,472.32,Wholesale,Corporate
+ORD-0179,2025-12-15,West,Clothing,T-Shirt,1,123.51,123.51,Online,Consumer
+ORD-0180,2025-02-04,South,Clothing,T-Shirt,2,149.14,298.28,Online,Consumer
+ORD-0181,2025-04-28,East,Clothing,T-Shirt,5,46.31,231.55,Wholesale,Corporate
+ORD-0182,2025-07-05,North,Sports,Bicycle,1,447.07,447.07,Retail,Consumer
+ORD-0183,2025-09-11,South,Electronics,Headphones,1,1193.2,1193.2,Online,Consumer
+ORD-0184,2025-04-22,East,Electronics,Laptop,5,402.84,2014.2,Retail,Consumer
+ORD-0185,2025-09-17,North,Sports,Dumbbells,4,359.05,1436.2,Retail,Home Office
+ORD-0186,2025-10-09,East,Electronics,Headphones,5,734.92,3674.6,Wholesale,Consumer
+ORD-0187,2025-12-27,West,Electronics,Headphones,4,157.8,631.2,Online,Home Office
+ORD-0188,2025-12-10,South,Books,Fiction Novel,2,11.85,23.7,Retail,Corporate
+ORD-0189,2025-11-24,North,Clothing,Sneakers,1,138.5,138.5,Retail,Consumer
+ORD-0190,2025-12-03,North,Sports,Bicycle,5,256.78,1283.9,Wholesale,Home Office
+ORD-0191,2025-07-04,East,Clothing,Jeans,5,134.62,673.1,Online,Home Office
+ORD-0192,2025-08-13,East,Books,Cookbook,1,46.22,46.22,Online,Corporate
+ORD-0193,2025-02-08,North,Clothing,Jeans,4,33.77,135.08,Online,Corporate
+ORD-0194,2025-01-11,North,Books,Biography,1,41.2,41.2,Online,Home Office
+ORD-0195,2025-07-21,East,Clothing,Sneakers,2,45.55,91.1,Wholesale,Home Office
+ORD-0196,2025-01-29,East,Clothing,Sneakers,4,75.67,302.68,Online,Consumer
+ORD-0197,2025-01-21,East,Books,Cookbook,5,20.1,100.5,Retail,Home Office
+ORD-0198,2025-02-19,West,Electronics,Tablet,5,536.93,2684.65,Wholesale,Home Office
+ORD-0199,2025-04-13,West,Sports,Yoga Mat,3,24.85,74.55,Wholesale,Home Office
+ORD-0200,2025-07-03,West,Sports,Bicycle,1,447.89,447.89,Online,Home Office
+ORD-0201,2025-08-21,West,Home & Kitchen,Coffee Maker,1,70.27,70.27,Retail,Consumer
+ORD-0202,2025-07-14,North,Sports,Yoga Mat,1,147.68,147.68,Online,Home Office
+ORD-0203,2025-06-12,South,Electronics,Smartphone,1,903.3,903.3,Retail,Corporate
+ORD-0204,2025-10-22,North,Sports,Bicycle,1,311.56,311.56,Online,Corporate
+ORD-0205,2025-01-24,South,Clothing,Jeans,4,54.51,218.04,Wholesale,Corporate
+ORD-0206,2025-07-17,West,Books,Cookbook,4,49.26,197.04,Online,Home Office
+ORD-0207,2025-12-12,South,Books,Cookbook,1,28.76,28.76,Retail,Consumer
+ORD-0208,2025-04-11,South,Home & Kitchen,Lamp,2,271.34,542.68,Retail,Consumer
+ORD-0209,2025-08-14,West,Sports,Dumbbells,2,341.02,682.04,Online,Corporate
+ORD-0210,2025-06-29,West,Clothing,Jeans,4,121.52,486.08,Online,Corporate
+ORD-0211,2025-10-27,East,Books,Cookbook,3,42.53,127.59,Retail,Corporate
+ORD-0212,2025-05-24,East,Clothing,T-Shirt,5,26.08,130.4,Wholesale,Home Office
+ORD-0213,2025-05-26,South,Home & Kitchen,Lamp,3,47.78,143.34,Wholesale,Consumer
+ORD-0214,2025-09-23,East,Books,Fiction Novel,1,54.44,54.44,Wholesale,Consumer
+ORD-0215,2025-12-19,West,Electronics,Laptop,1,263.89,263.89,Online,Consumer
+ORD-0216,2025-12-10,South,Books,Biography,4,53.64,214.56,Wholesale,Home Office
+ORD-0217,2025-07-22,East,Electronics,Laptop,4,105.35,421.4,Retail,Consumer
+ORD-0218,2025-10-28,East,Home & Kitchen,Cookware Set,1,226.07,226.07,Retail,Corporate
+ORD-0219,2025-03-17,North,Home & Kitchen,Coffee Maker,3,42.21,126.63,Online,Consumer
+ORD-0220,2025-08-31,East,Electronics,Laptop,5,491.89,2459.45,Wholesale,Home Office
+ORD-0221,2025-11-05,North,Electronics,Laptop,5,1136.61,5683.05,Online,Corporate
+ORD-0222,2025-09-01,South,Sports,Dumbbells,3,147.37,442.11,Online,Consumer
+ORD-0223,2025-12-22,South,Electronics,Smartphone,3,163.66,490.98,Retail,Consumer
+ORD-0224,2025-04-03,East,Sports,Tennis Racket,1,75.68,75.68,Wholesale,Corporate
+ORD-0225,2025-10-28,North,Clothing,T-Shirt,3,28.9,86.7,Online,Consumer
+ORD-0226,2025-03-23,North,Clothing,Jeans,3,110.25,330.75,Online,Home Office
+ORD-0227,2025-03-16,West,Clothing,Jeans,1,35.38,35.38,Wholesale,Consumer
+ORD-0228,2025-08-19,South,Home & Kitchen,Lamp,5,209.29,1046.45,Online,Corporate
+ORD-0229,2025-11-27,West,Sports,Yoga Mat,4,493.69,1974.76,Wholesale,Corporate
+ORD-0230,2025-12-24,South,Clothing,T-Shirt,2,21.47,42.94,Wholesale,Corporate
+ORD-0231,2025-03-09,West,Clothing,Sneakers,5,94.94,474.7,Retail,Corporate
+ORD-0232,2025-06-16,North,Home & Kitchen,Cookware Set,1,59.68,59.68,Retail,Consumer
+ORD-0233,2025-12-06,North,Sports,Yoga Mat,2,73,146,Online,Consumer
+ORD-0234,2025-12-07,West,Sports,Tennis Racket,1,328,328,Online,Corporate
+ORD-0235,2025-03-31,South,Clothing,Jacket,3,11.71,35.13,Wholesale,Consumer
+ORD-0236,2025-08-25,North,Sports,Tennis Racket,1,60.26,60.26,Online,Home Office
+ORD-0237,2025-12-22,West,Home & Kitchen,Cookware Set,3,289.16,867.48,Online,Home Office
+ORD-0238,2025-07-21,South,Books,Textbook,2,43.44,86.88,Retail,Home Office
+ORD-0239,2025-09-25,North,Books,Fiction Novel,3,35.97,107.91,Online,Consumer
+ORD-0240,2025-05-21,North,Books,Biography,3,54.52,163.56,Online,Corporate
+ORD-0241,2025-01-08,East,Clothing,Jeans,5,76.78,383.9,Online,Consumer
+ORD-0242,2025-12-28,South,Books,Biography,3,44.06,132.18,Online,Home Office
+ORD-0243,2025-02-26,West,Electronics,Headphones,5,376.24,1881.2,Online,Home Office
+ORD-0244,2025-07-09,East,Books,Cookbook,3,48.51,145.53,Online,Corporate
+ORD-0245,2025-12-19,North,Clothing,T-Shirt,1,105.18,105.18,Wholesale,Consumer
+ORD-0246,2025-04-01,West,Books,Textbook,5,27.8,139,Wholesale,Consumer
+ORD-0247,2025-01-15,West,Clothing,Jacket,1,95.58,95.58,Retail,Corporate
+ORD-0248,2025-09-11,East,Sports,Dumbbells,3,439.03,1317.09,Retail,Consumer
+ORD-0249,2025-12-22,West,Home & Kitchen,Cookware Set,4,171.1,684.4,Wholesale,Home Office
+ORD-0250,2025-08-27,East,Books,Cookbook,1,21.28,21.28,Retail,Home Office
+ORD-0251,2025-03-11,West,Home & Kitchen,Blender,1,139.18,139.18,Retail,Home Office
+ORD-0252,2025-04-15,North,Sports,Yoga Mat,5,244.28,1221.4,Retail,Consumer
+ORD-0253,2025-05-15,South,Electronics,Smartphone,5,742.4,3712,Online,Corporate
+ORD-0254,2025-02-09,North,Electronics,Smartphone,1,65.43,65.43,Wholesale,Consumer
+ORD-0255,2025-02-02,North,Books,Cookbook,2,53.19,106.38,Retail,Home Office
+ORD-0256,2025-03-25,North,Clothing,Jeans,5,134.59,672.95,Online,Home Office
+ORD-0257,2025-07-15,West,Electronics,Tablet,2,727.51,1455.02,Online,Corporate
+ORD-0258,2025-09-10,West,Electronics,Headphones,5,40.75,203.75,Wholesale,Corporate
+ORD-0259,2025-01-22,North,Electronics,Laptop,5,700.48,3502.4,Online,Corporate
+ORD-0260,2025-04-23,North,Home & Kitchen,Coffee Maker,4,73.43,293.72,Wholesale,Corporate
+ORD-0261,2025-06-20,East,Sports,Yoga Mat,4,446.49,1785.96,Retail,Consumer
+ORD-0262,2025-08-12,East,Electronics,Tablet,5,441.62,2208.1,Wholesale,Consumer
+ORD-0263,2025-10-26,South,Books,Cookbook,5,37.47,187.35,Retail,Consumer
+ORD-0264,2025-11-21,West,Books,Biography,2,58.08,116.16,Online,Corporate
+ORD-0265,2025-04-16,West,Electronics,Laptop,5,956.18,4780.9,Retail,Corporate
+ORD-0266,2025-08-22,East,Sports,Tennis Racket,5,430.05,2150.25,Online,Corporate
+ORD-0267,2025-04-21,East,Sports,Tennis Racket,5,59.94,299.7,Retail,Home Office
+ORD-0268,2025-12-28,South,Sports,Yoga Mat,1,187.72,187.72,Online,Home Office
+ORD-0269,2025-07-30,North,Books,Cookbook,3,26.23,78.69,Wholesale,Home Office
+ORD-0270,2025-02-16,East,Books,Biography,5,43.08,215.4,Retail,Consumer
+ORD-0271,2025-04-05,East,Books,Fiction Novel,2,33.01,66.02,Online,Home Office
+ORD-0272,2025-10-20,East,Home & Kitchen,Cookware Set,2,19.53,39.06,Wholesale,Consumer
+ORD-0273,2025-11-02,East,Clothing,T-Shirt,2,35.22,70.44,Wholesale,Corporate
+ORD-0274,2025-05-27,North,Electronics,Smartphone,2,125.99,251.98,Retail,Home Office
+ORD-0275,2025-07-27,North,Electronics,Smartphone,5,1069.12,5345.6,Online,Home Office
+ORD-0276,2025-08-06,East,Sports,Tennis Racket,3,169.24,507.72,Wholesale,Corporate
+ORD-0277,2025-09-05,West,Sports,Tennis Racket,2,493.85,987.7,Wholesale,Consumer
+ORD-0278,2025-01-20,East,Electronics,Smartphone,4,1157.18,4628.72,Wholesale,Home Office
+ORD-0279,2025-11-12,South,Home & Kitchen,Lamp,2,206.39,412.78,Online,Corporate
+ORD-0280,2025-10-01,East,Clothing,T-Shirt,4,80.54,322.16,Wholesale,Home Office
+ORD-0281,2025-02-22,South,Sports,Tennis Racket,5,69.71,348.55,Online,Corporate
+ORD-0282,2025-09-19,South,Electronics,Smartphone,5,671,3355,Wholesale,Corporate
+ORD-0283,2025-11-10,East,Clothing,Jeans,1,20.14,20.14,Retail,Consumer
+ORD-0284,2025-07-13,North,Home & Kitchen,Blender,3,66.03,198.09,Online,Consumer
+ORD-0285,2025-03-05,South,Electronics,Laptop,2,924.32,1848.64,Online,Home Office
+ORD-0286,2025-06-24,South,Electronics,Laptop,5,249.02,1245.1,Retail,Corporate
+ORD-0287,2025-01-23,North,Books,Biography,3,53.96,161.88,Wholesale,Home Office
+ORD-0288,2025-05-28,West,Clothing,Jeans,4,134.77,539.08,Online,Home Office
+ORD-0289,2025-11-11,West,Home & Kitchen,Blender,1,103.39,103.39,Retail,Home Office
+ORD-0290,2025-07-25,West,Clothing,Sneakers,3,80.42,241.26,Wholesale,Consumer
+ORD-0291,2025-12-26,East,Electronics,Smartphone,4,906.29,3625.16,Online,Home Office
+ORD-0292,2025-05-22,South,Clothing,T-Shirt,4,25.62,102.48,Online,Home Office
+ORD-0293,2025-09-07,South,Home & Kitchen,Cookware Set,4,30.37,121.48,Online,Corporate
+ORD-0294,2025-02-13,East,Clothing,Jeans,5,88.51,442.55,Retail,Home Office
+ORD-0295,2025-01-21,West,Electronics,Headphones,2,786.63,1573.26,Retail,Consumer
+ORD-0296,2025-04-22,North,Books,Cookbook,1,19.96,19.96,Online,Home Office
+ORD-0297,2025-10-26,East,Home & Kitchen,Lamp,3,64.87,194.61,Wholesale,Home Office
+ORD-0298,2025-07-09,North,Electronics,Smartphone,2,647.59,1295.18,Retail,Home Office
+ORD-0299,2025-11-01,East,Home & Kitchen,Blender,5,51.44,257.2,Retail,Consumer
+ORD-0300,2025-03-03,West,Clothing,Jeans,3,98.46,295.38,Online,Consumer

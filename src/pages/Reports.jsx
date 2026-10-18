@@ -17,6 +17,7 @@ import { useData } from '../context/DataContext'
 import ChartRenderer from '../components/ChartRenderer'
 import EmptyState from '../components/EmptyState'
 import { exportDatasetCSV, downloadChartPNG, triggerPrint } from '../utils/exportUtils'
+import { useToast } from '../components/Toast'
 import { analyzeQuality } from '../utils/cleaning'
 import { generateInsights } from '../utils/insights'
 import { describeColumn } from '../utils/statistics'
@@ -69,6 +70,7 @@ const KIND_STYLE = {
 
 export default function Reports() {
   const { dataset, savedCharts, setPage } = useData()
+  const toast = useToast()
   const chartRefs = useRef({})
 
   const quality = useMemo(() => (dataset ? analyzeQuality(dataset) : null), [dataset])
@@ -167,8 +169,18 @@ export default function Reports() {
         ? chartRefs.current[chart.id].querySelector('svg')
         : null
       await downloadChartPNG(svg, `${chart.title || 'chart'}.png`)
+      toast.success(`Chart exported: ${chart.title || 'chart'}.png`)
     } catch (e) {
-      window.alert(`PNG export failed: ${e && e.message ? e.message : e}`)
+      toast.error(`PNG export failed: ${e && e.message ? e.message : e}`)
+    }
+  }
+
+  const exportFullCSV = () => {
+    try {
+      exportDatasetCSV(dataset)
+      toast.success('Full dataset exported to CSV.')
+    } catch (e) {
+      toast.error(`CSV export failed: ${e && e.message ? e.message : e}`)
     }
   }
 
@@ -178,7 +190,7 @@ export default function Reports() {
       <div className="no-print flex flex-wrap items-center gap-3">
         <button
           type="button"
-          onClick={() => exportDatasetCSV(dataset)}
+          onClick={exportFullCSV}
           className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-500"
         >
           <Download size={15} />

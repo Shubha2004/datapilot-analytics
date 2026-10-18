@@ -23,10 +23,13 @@ import {
   TriangleAlert,
   ListFilter,
   SlidersHorizontal,
+  Loader2,
 } from 'lucide-react'
 import { useData } from '../context/DataContext'
 import ChartRenderer from '../components/ChartRenderer'
 import EmptyState from '../components/EmptyState'
+import { useToast } from '../components/Toast'
+import ConfirmDialog from '../components/ConfirmDialog'
 import { validateChartConfig } from '../utils/chartData'
 import { downloadChartPNG } from '../utils/exportUtils'
 
@@ -131,6 +134,7 @@ function ColumnSelect({ label, value, onChange, groups, allowEmpty, emptyLabel }
 
 export default function ChartBuilder() {
   const { dataset, savedCharts, addChart, updateChart, deleteChart } = useData()
+  const toast = useToast()
   const cardRefs = useRef({})
 
   const [draft, setDraft] = useState(() => defaultDraft(dataset ? dataset.columns : []))
@@ -142,6 +146,8 @@ export default function ChartBuilder() {
   }))
   const [renamingId, setRenamingId] = useState(null)
   const [renameValue, setRenameValue] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [exportingId, setExportingId] = useState(null)
 
   const groups = useMemo(() => {
     const g = { Numeric: [], Categorical: [], Date: [], Other: [] }
@@ -198,22 +204,25 @@ export default function ChartBuilder() {
 
   const handleSave = () => {
     if (errors.length > 0) return
-    addChart({
-      ...draft,
-      id: newId(),
-      title: chartName.trim() || draft.title.trim() || 'Untitled chart',
-    })
+    const name = chartName.trim() || draft.title.trim() || 'Untitled chart'
+    addChart({ ...draft, id: newId(), title: name })
     setChartName('')
+    toast.success(`Saved chart “${name}”.`)
   }
 
   const exportPNG = async (chart) => {
+    if (exportingId) return
+    setExportingId(chart.id)
     try {
       const svg = cardRefs.current[chart.id]
         ? cardRefs.current[chart.id].querySelector('svg')
         : null
       await downloadChartPNG(svg, `${chart.title || 'chart'}.png`)
+      toast.success(`Exported “${chart.title || 'Untitled chart'}” as PNG.`)
     } catch (e) {
-      window.alert(`PNG export failed: ${e && e.message ? e.message : e}`)
+      toast.error(`PNG export failed: ${e && e.message ? e.message : e}`)
+    } finally {
+      setExportingId(null)
     }
   }
 
@@ -223,14 +232,23 @@ export default function ChartBuilder() {
   }
 
   const confirmRename = (chart) => {
-    updateChart(chart.id, { title: renameValue.trim() || chart.title })
+    const name = renameValue.trim() || chart.title
+    const changed = name !== chart.title
+    updateChart(chart.id, { title: name })
     setRenamingId(null)
+    if (changed) toast.success(`Renamed chart to “${name}”.`)
   }
 
   const handleDelete = (chart) => {
-    if (window.confirm(`Delete chart “${chart.title || 'Untitled chart'}”?`)) {
-      deleteChart(chart.id)
-    }
+    setDeleteTarget(chart)
+  }
+
+  const confirmDelete = () => {
+    if (!deleteTarget) return
+    const name = deleteTarget.title || 'Untitled chart'
+    deleteChart(deleteTarget.id)
+    setDeleteTarget(null)
+    toast.success(`Deleted chart “${name}”.`)
   }
 
   return (
@@ -550,11 +568,16 @@ export default function ChartBuilder() {
                       <button
                         type="button"
                         onClick={() => exportPNG(chart)}
+                        disabled={exportingId === chart.id}
                         aria-label="Export chart as PNG"
                         title="Export PNG"
-                        className={iconBtnCls}
+                        className={`${iconBtnCls} disabled:opacity-50`}
                       >
-                        <Download size={14} />
+                        {exportingId === chart.id ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                          <Download size={14} />
+                        )}
                       </button>
                       <button
                         type="button"
@@ -573,6 +596,17 @@ export default function ChartBuilder() {
           </div>
         </div>
       </div>
+
+      {/* Delete-chart confirmation */}
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete chart?"
+        description={`“${deleteTarget?.title || 'Untitled chart'}” will be removed from the saved charts gallery. This cannot be undone.`}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   )
 }

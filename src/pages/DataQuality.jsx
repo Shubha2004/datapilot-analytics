@@ -14,8 +14,11 @@ import {
   Undo2,
   History,
   AlertTriangle,
+  Loader2,
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
+import { useToast } from '../components/Toast';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { isMissing } from '../utils/dataTypes';
 import {
   removeDuplicates,
@@ -157,6 +160,7 @@ const inputCls =
 
 export default function DataQuality() {
   const { dataset, originalDataset, updateDataset, resetDataset } = useData();
+  const toast = useToast();
   const [op, setOp] = useState('remove-duplicates');
   const [column, setColumn] = useState('');
   const [newName, setNewName] = useState('');
@@ -167,6 +171,9 @@ export default function DataQuality() {
   const [preview, setPreview] = useState(null);
   const [previewError, setPreviewError] = useState('');
   const [confirming, setConfirming] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [revertTarget, setRevertTarget] = useState(null);
+  const [restoreOpen, setRestoreOpen] = useState(false);
   // Ordered history of applied steps. Each entry keeps a snapshot of the
   // rows *before* the step, so any step can be reverted individually
   // (reverting a step also undoes the steps applied after it, since those
@@ -191,6 +198,9 @@ export default function DataQuality() {
     setPreview(null);
     setPreviewError('');
     setConfirming(false);
+    setApplying(false);
+    setRevertTarget(null);
+    setRestoreOpen(false);
   }, [originalDataset]);
 
   // Sensible default column whenever the operation changes.
@@ -280,38 +290,54 @@ export default function DataQuality() {
     setConfirming(true);
   };
 
-  // Step 2: the user confirmed — record history and apply.
+  // Step 2: the user confirmed — record history and apply. The apply is
+  // synchronous but re-infers columns over every row, so it can block on
+  // large datasets; defer a tick so the spinner paints first.
   const handleConfirmApply = () => {
-    if (!preview) return;
+    if (!preview || applying) return;
     const opLabel = OPERATIONS.find((o) => o.value === op)?.label || op;
-    const entry = {
-      id: `step-${Date.now().toString(36)}`,
-      label: opLabel,
-      detail: preview.detail,
-      at: new Date().toISOString(),
-      // Pre-step snapshot: pure ops never mutate, so this reference stays
-      // a faithful, recoverable copy of the data before the step.
-      beforeRows: dataset.rows,
-    };
-    setHistory((h) => [...h, entry]);
-    updateDataset(preview.resultRows, `${opLabel}: ${preview.detail}`);
-    setPreview(null);
-    setConfirming(false);
-    setDropColumns([]);
+    // Snapshot before the deferred run; the user can't change inputs while
+    // the apply button is disabled.
+    const detail = preview.detail;
+    const resultRows = preview.resultRows;
+    const beforeRows = dataset.rows;
+    setApplying(true);
+    setTimeout(() => {
+      try {
+        const entry = {
+          id: `step-${Date.now().toString(36)}`,
+          label: opLabel,
+          detail,
+          at: new Date().toISOString(),
+          // Pre-step snapshot: pure ops never mutate, so this reference stays
+          // a faithful, recoverable copy of the data before the step.
+          beforeRows,
+        };
+        setHistory((h) => [...h, entry]);
+        updateDataset(resultRows, `${opLabel}: ${detail}`);
+        toast.success(`Applied “${opLabel}”.`);
+      } catch (e) {
+        toast.error(`Apply failed: ${e?.message || e}`);
+      } finally {
+        setPreview(null);
+        setConfirming(false);
+        setDropColumns([]);
+        setApplying(false);
+      }
+    }, 30);
   };
 
-  /** Revert the dataset to before history step `index`. */
+  /** Open the confirmation dialog to revert history step `index`. */
   const handleRevertStep = (index) => {
     const entry = history[index];
     if (!entry) return;
-    const later = history.length - index - 1;
-    const ok = window.confirm(
-      `Revert "${entry.label}"?\n\n${entry.detail}.\n\n` +
-        (later > 0
-          ? `This also undoes the ${later} step${later === 1 ? '' : 's'} applied after it.`
-          : 'The dataset returns to how it was before this step.'),
-    );
-    if (!ok) return;
+    setRevertTarget({ index, entry, later: history.length - index - 1 });
+  };
+
+  /** The user confirmed the revert — roll back to before that step. */
+  const confirmRevertStep = () => {
+    if (!revertTarget) return;
+    const { index, entry } = revertTarget;
     updateDataset(
       entry.beforeRows,
       `Reverted to before step ${index + 1}: ${entry.label}`,
@@ -320,18 +346,24 @@ export default function DataQuality() {
     setPreview(null);
     setPreviewError('');
     setConfirming(false);
+    setRevertTarget(null);
+    toast.success(`Reverted to before step ${index + 1}: ${entry.label}.`);
   };
 
+  /** Open the confirmation dialog to restore the original dataset. */
   const handleRestoreOriginal = () => {
-    const ok = window.confirm(
-      'Restore the original dataset?\n\nAll cleaning steps will be discarded.',
-    );
-    if (!ok) return;
+    setRestoreOpen(true);
+  };
+
+  /** The user confirmed — discard all cleaning steps. */
+  const confirmRestoreOriginal = () => {
     resetDataset();
     setHistory([]);
     setPreview(null);
     setPreviewError('');
     setConfirming(false);
+    setRestoreOpen(false);
+    toast.success('Original dataset restored. All cleaning steps discarded.');
   };
 
   // Dataset differs from original once a cleaning op has been applied
@@ -638,11 +670,15 @@ export default function DataQuality() {
               </button>
               <button
                 onClick={handleApply}
-                disabled={!preview || confirming}
+                disabled={!preview || confirming || applying}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
               >
-                <BrushCleaning size={15} />
-                Apply
+                {applying ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : (
+                  <BrushCleaning size={15} />
+                )}
+                {applying ? 'Applying…' : 'Apply'}
               </button>
               {isDirty && (
                 <button
@@ -671,10 +707,15 @@ export default function DataQuality() {
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
                     onClick={handleConfirmApply}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700"
+                    disabled={applying}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-60"
                   >
-                    <BrushCleaning size={15} />
-                    Yes, apply this change
+                    {applying ? (
+                      <Loader2 size={15} className="animate-spin" />
+                    ) : (
+                      <BrushCleaning size={15} />
+                    )}
+                    {applying ? 'Applying…' : 'Yes, apply this change'}
                   </button>
                   <button
                     onClick={() => setConfirming(false)}
@@ -798,6 +839,37 @@ export default function DataQuality() {
           </div>
         </>
       )}
+
+      {/* Revert-step confirmation */}
+      <ConfirmDialog
+        open={revertTarget !== null}
+        title={
+          revertTarget ? `Revert "${revertTarget.entry.label}"?` : 'Revert step?'
+        }
+        description={
+          revertTarget
+            ? `${revertTarget.entry.detail}. ` +
+              (revertTarget.later > 0
+                ? `This also undoes the ${revertTarget.later} step${revertTarget.later === 1 ? '' : 's'} applied after it.`
+                : 'The dataset returns to how it was before this step.')
+            : ''
+        }
+        confirmLabel="Revert"
+        destructive
+        onConfirm={confirmRevertStep}
+        onCancel={() => setRevertTarget(null)}
+      />
+
+      {/* Restore-original confirmation */}
+      <ConfirmDialog
+        open={restoreOpen}
+        title="Restore original dataset?"
+        description="All cleaning steps will be discarded. The dataset returns to how it was when last loaded."
+        confirmLabel="Restore original"
+        destructive
+        onConfirm={confirmRestoreOriginal}
+        onCancel={() => setRestoreOpen(false)}
+      />
     </div>
   );
 }

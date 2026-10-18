@@ -13,6 +13,7 @@ import {
 import { buildDataset } from '../utils/dataTypes';
 import { generateSampleData } from '../utils/sampleData';
 import ConnectorModal from './ConnectorModal';
+import { useToast } from './Toast';
 
 const PREVIEW_ROWS = 8;
 
@@ -25,6 +26,7 @@ function formatSize(bytes) {
 
 export default function FileUploader({ compact = false }) {
   const { setDataset, setIsLoading } = useData();
+  const toast = useToast();
   const inputRef = useRef(null);
   const [dragOver, setDragOver] = useState(false);
   const [error, setError] = useState(null);
@@ -44,8 +46,10 @@ export default function FileUploader({ compact = false }) {
   const handleLoadSample = () => {
     try {
       setDataset(generateSampleData());
+      toast.success('Sample dataset loaded.');
     } catch (err) {
       setError(err.message);
+      toast.error(err.message);
     }
   };
 
@@ -53,6 +57,7 @@ export default function FileUploader({ compact = false }) {
     setError(message);
     setBusy(false);
     setIsLoading(false);
+    toast.error(message);
   };
 
   const finish = (file, rows, columns, sheetName, report) => {
@@ -166,6 +171,7 @@ export default function FileUploader({ compact = false }) {
   const handleConfirmDataset = () => {
     if (!parsed) return;
     try {
+      const rowCount = parsed.rows.length;
       setDataset(
         buildDataset(parsed.fileName.replace(/\.[^.]+$/, ''), parsed.rows, {
           source: 'upload',
@@ -176,8 +182,10 @@ export default function FileUploader({ compact = false }) {
           importSummary: parsed.summary || null,
         })
       );
+      toast.success(`Dataset loaded: ${rowCount} rows.`);
     } catch (err) {
       setError(err.message);
+      toast.error(err.message);
     }
   };
 

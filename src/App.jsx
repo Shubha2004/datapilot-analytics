@@ -33,7 +33,7 @@ export default function App() {
         onCloseMobile={() => setMobileNavOpen(false)}
       />
       <div className="flex min-w-0 flex-1 flex-col">
-        <Header onMenuClick={() => setMobileNavOpen(true)} />
+        <Header onMenuClick={() => setMobileNavOpen(true)} mobileOpen={mobileNavOpen} />
         <main
           id="main-content"
           className="min-h-0 flex-1 overflow-y-auto px-4 py-6 md:px-6"

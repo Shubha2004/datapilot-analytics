@@ -264,13 +264,8 @@ export function DataProvider({ children }) {
   }, [dataset, prefs.persistDataset])
 
   // ---- Danger zone -------------------------------------------------------
+  // Note: confirmation is handled by callers (Settings page) before invoking.
   const clearLocalData = useCallback(async () => {
-    const ok = window.confirm(
-      'Clear all locally stored DataPilot data?\n\n' +
-        'This removes saved charts, preferences, the theme choice, and any ' +
-        'persisted dataset from this browser. It cannot be undone.',
-    )
-    if (!ok) return
     try {
       localStorage.removeItem(THEME_KEY)
       localStorage.removeItem(PREFS_KEY)

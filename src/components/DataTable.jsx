@@ -28,6 +28,7 @@ import {
 import { isMissing, toNumber } from '../utils/dataTypes';
 import { downloadCSV } from '../utils/exportUtils';
 import EmptyState from './EmptyState';
+import { useToast } from './Toast';
 
 /* ------------------------------------------------------------------ */
 /* Filter value shape: { text, nullness, min, max }                     */
@@ -138,6 +139,7 @@ function ColumnFilter({ column, type }) {
 /* ------------------------------------------------------------------ */
 
 export default function DataTable({ dataset }) {
+  const toast = useToast();
   const [globalFilter, setGlobalFilter] = useState('');
   const [sorting, setSorting] = useState([]);
   const [columnFilters, setColumnFilters] = useState([]);
@@ -236,11 +238,16 @@ export default function DataTable({ dataset }) {
     const filteredRows = table
       .getFilteredRowModel()
       .rows.map((r) => r.original);
-    downloadCSV(
-      `${dataset.name || 'dataset'}-filtered.csv`,
-      visibleCols,
-      filteredRows,
-    );
+    try {
+      downloadCSV(
+        `${dataset.name || 'dataset'}-filtered.csv`,
+        visibleCols,
+        filteredRows,
+      );
+      toast.success(`Exported ${filteredRows.length} filtered rows to CSV.`);
+    } catch (err) {
+      toast.error(`CSV export failed: ${err.message}`);
+    }
   };
 
   return (

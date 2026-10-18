@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import {
   Palette,
   Database,
@@ -5,9 +6,11 @@ import {
   ShieldCheck,
   Info,
   Trash2,
+  Loader2,
 } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import ThemeToggle from '../components/ThemeToggle.jsx'
+import { useToast } from '../components/Toast.jsx'
 import { version } from '../../package.json'
 
 function Toggle({ checked, onChange, label }) {
@@ -72,8 +75,34 @@ const STACK = [
 ]
 
 export default function Settings() {
-  const { theme, toggleTheme, prefs, updatePrefs, clearLocalData, persistenceStatus } =
+  const { theme, toggleTheme, prefs, updatePrefs, clearLocalData, persistenceStatus, dataset, savedCharts } =
     useData()
+  const toast = useToast()
+  const [clearing, setClearing] = useState(false)
+  const clearWatchRef = useRef(false)
+
+  const handleClearData = async () => {
+    if (clearing) return
+    setClearing(true)
+    // Watch for the state to actually empty: clearLocalData shows its own
+    // built-in confirmation, so if the user cancels there, nothing changes
+    // and no misleading "cleared" toast is shown.
+    clearWatchRef.current = true
+    try {
+      await clearLocalData()
+    } finally {
+      setClearing(false)
+    }
+  }
+
+  // Fires only when a clear actually landed (charts and dataset emptied).
+  useEffect(() => {
+    if (!clearWatchRef.current) return
+    if (savedCharts.length === 0 && dataset === null) {
+      clearWatchRef.current = false
+      toast.success('Local data cleared.')
+    }
+  }, [savedCharts, dataset, toast])
 
   const statusNote = (s, okText) => {
     if (!s) return null
@@ -154,11 +183,16 @@ export default function Settings() {
           control={
             <button
               type="button"
-              onClick={clearLocalData}
-              className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-red-500"
+              onClick={handleClearData}
+              disabled={clearing}
+              className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-red-500 disabled:opacity-60"
             >
-              <Trash2 size={16} />
-              Clear local data
+              {clearing ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Trash2 size={16} />
+              )}
+              {clearing ? 'Clearing…' : 'Clear local data'}
             </button>
           }
         />

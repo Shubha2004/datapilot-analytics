@@ -49,6 +49,106 @@ body {
   outline-offset: 2px;
 }
 
+/* ---- Chart + tooltip theme variables ----
+   Single source of truth for the custom recharts tooltip colors
+   (see .dp-chart-tooltip below, rendered by ChartRenderer.jsx).
+   They flip with the `dark` class that DataContext toggles on <html>,
+   so tooltip styling always matches the active theme. */
+:root {
+  --chart-tooltip-bg: #ffffff;
+  --chart-tooltip-border: #e2e8f0;
+  --chart-tooltip-text: #0f172a;
+  --chart-tooltip-muted: #64748b;
+  --chart-tooltip-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  --chart-accent: #6366f1;
+}
+.dark {
+  --chart-tooltip-bg: #0f172a;
+  --chart-tooltip-border: #1e293b;
+  --chart-tooltip-text: #e2e8f0;
+  --chart-tooltip-muted: #94a3b8;
+  --chart-tooltip-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --chart-accent: #818cf8;
+}
+
+/* Shared custom tooltip for all recharts charts. Colors resolve from the
+   variables above, so light/dark follow the active theme automatically. */
+.dp-chart-tooltip {
+  background-color: var(--chart-tooltip-bg);
+  border: 1px solid var(--chart-tooltip-border);
+  border-radius: 10px;
+  box-shadow: var(--chart-tooltip-shadow);
+  color: var(--chart-tooltip-text);
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 1.5;
+  max-width: 300px;
+  padding: 8px 10px;
+  pointer-events: none;
+}
+.dp-chart-tooltip-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+  overflow-wrap: anywhere;
+}
+.dp-chart-tooltip-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dp-chart-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.dp-chart-tooltip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  flex: none;
+}
+.dp-chart-tooltip-name {
+  color: var(--chart-tooltip-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dp-chart-tooltip-value {
+  margin-left: auto;
+  padding-left: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Text selection */
+::selection {
+  background-color: #c7d2fe;
+  color: #1e1b4b;
+}
+.dark ::selection {
+  background-color: #4338ca;
+  color: #eef2ff;
+}
+
+/* Honor reduced-motion: kill smooth scrolling and CSS transitions/animations.
+   Recharts' JS-driven chart animations are disabled separately in
+   ChartRenderer.jsx (isAnimationActive={false}), since CSS cannot reach them. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* Print rules for reports */
 .print-only {
   display: none;

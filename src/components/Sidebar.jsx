@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import {
   X,
   ChevronLeft,
@@ -23,7 +24,7 @@ export const NAV_ITEMS = [
   { id: 'settings', label: 'Settings', icon: Settings },
 ]
 
-function NavContent({ collapsed, onNavigate }) {
+function NavContent({ collapsed, onNavigate, tabbable = true }) {
   const { page, setPage, dataset } = useData()
 
   return (
@@ -58,8 +59,9 @@ function NavContent({ collapsed, onNavigate }) {
                 onNavigate?.()
               }}
               title={collapsed ? item.label : undefined}
+              tabIndex={tabbable ? undefined : -1}
               aria-current={active ? 'page' : undefined}
-              className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+              className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors motion-reduce:transition-none ${
                 collapsed ? 'justify-center px-0' : ''
               } ${
                 active
@@ -82,14 +84,14 @@ function NavContent({ collapsed, onNavigate }) {
       >
         {!collapsed ? (
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Dataset
             </p>
             <p className="truncate text-sm font-medium text-slate-700 dark:text-slate-300">
               {dataset?.name ?? 'No dataset'}
             </p>
             {dataset && (
-              <p className="text-xs text-slate-400 dark:text-slate-500">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 {dataset.rows.length.toLocaleString()} rows
               </p>
             )}
@@ -109,12 +111,30 @@ function NavContent({ collapsed, onNavigate }) {
 
 export default function Sidebar({ mobileOpen, onCloseMobile }) {
   const { sidebarCollapsed, toggleSidebar } = useData()
+  const closeButtonRef = useRef(null)
+
+  // Escape closes the drawer; lock body scroll and move focus into the
+  // dialog while it is open.
+  useEffect(() => {
+    if (!mobileOpen) return
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') onCloseMobile()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    closeButtonRef.current?.focus({ preventScroll: true })
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.body.style.overflow = prevOverflow
+    }
+  }, [mobileOpen, onCloseMobile])
 
   return (
     <>
       {/* Desktop sidebar */}
       <aside
-        className={`relative hidden shrink-0 border-r border-slate-200 bg-white transition-all duration-200 md:block dark:border-slate-800 dark:bg-slate-900 ${
+        className={`relative hidden shrink-0 border-r border-slate-200 bg-white transition-all duration-200 motion-reduce:transition-none md:block dark:border-slate-800 dark:bg-slate-900 ${
           sidebarCollapsed ? 'w-[68px]' : 'w-64'
         }`}
       >
@@ -123,7 +143,9 @@ export default function Sidebar({ mobileOpen, onCloseMobile }) {
           type="button"
           onClick={toggleSidebar}
           aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className="no-print absolute -right-3 top-20 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
+          aria-expanded={!sidebarCollapsed}
+          title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          className="no-print absolute -right-3 top-20 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition-colors motion-reduce:transition-none hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
         >
           {sidebarCollapsed ? (
             <ChevronRight size={14} />
@@ -141,27 +163,35 @@ export default function Sidebar({ mobileOpen, onCloseMobile }) {
         aria-hidden={!mobileOpen}
       >
         <div
-          className={`absolute inset-0 bg-slate-950/60 transition-opacity duration-200 ${
+          className={`absolute inset-0 bg-slate-950/60 transition-opacity duration-200 motion-reduce:transition-none ${
             mobileOpen ? 'opacity-100' : 'opacity-0'
           }`}
           onClick={onCloseMobile}
         />
         <aside
-          className={`absolute inset-y-0 left-0 w-72 bg-white shadow-xl transition-transform duration-200 dark:bg-slate-900 ${
+          id="mobile-nav-drawer"
+          className={`absolute inset-y-0 left-0 w-72 bg-white shadow-xl transition-transform duration-200 motion-reduce:transition-none dark:bg-slate-900 ${
             mobileOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
           role="dialog"
+          aria-modal="true"
           aria-label="Navigation"
         >
           <button
+            ref={closeButtonRef}
             type="button"
             onClick={onCloseMobile}
             aria-label="Close menu"
-            className="absolute right-3 top-4 rounded-lg p-1.5 text-slate-500 hover:bg-slate-200 dark:text-slate-400 dark:hover:bg-slate-800"
+            tabIndex={mobileOpen ? undefined : -1}
+            className="absolute right-3 top-4 rounded-lg p-1.5 text-slate-500 transition-colors motion-reduce:transition-none hover:bg-slate-200 dark:text-slate-400 dark:hover:bg-slate-800"
           >
             <X size={18} />
           </button>
-          <NavContent collapsed={false} onNavigate={onCloseMobile} />
+          <NavContent
+            collapsed={false}
+            onNavigate={onCloseMobile}
+            tabbable={mobileOpen}
+          />
         </aside>
       </div>
     </>

@@ -1,6 +1,12 @@
 /**
  * ChartRenderer.jsx — renders a ChartConfig against a Dataset with recharts v2.
  * Props: { config, dataset, height = 300 }.
+ *
+ * Styling-only layer: every number, aggregation and statistic comes from
+ * utils/chartData.js (buildChartData) and is untouched here. This file owns
+ * ONE shared visual theme that is applied uniformly to all 9 chart types:
+ * categorical palette, font sizes, grid/axis/tooltip styling, legend
+ * treatment and margins.
  */
 import { useMemo } from 'react';
 import {
@@ -26,18 +32,46 @@ import { AlertTriangle, BarChart3 } from 'lucide-react';
 import { buildChartData } from '../utils/chartData';
 import { useData } from '../context/DataContext';
 
-const PALETTE = [
-  '#6366f1',
-  '#818cf8',
-  '#a5b3fc',
-  '#c7d2fe',
-  '#4f46e5',
-  '#8b5cf6',
-  '#a78bfa',
-  '#c4b5fd',
+/**
+ * Categorical palette — distinct hues, all saturated enough to read on both
+ * light (white/slate-100) and dark (slate-950) surfaces. Never invents data:
+ * series i always maps to palette[i], so colors are stable across chart types.
+ */
+const CHART_PALETTE = [
+  '#6366f1', // indigo-500
+  '#0ea5e9', // sky-500
+  '#10b981', // emerald-500
+  '#f59e0b', // amber-500
+  '#ef4444', // red-500
+  '#8b5cf6', // violet-500
+  '#ec4899', // pink-500
+  '#14b8a6', // teal-500
+  '#f97316', // orange-500
+  '#84cc16', // lime-500
 ];
 
-const AXIS_MARGIN = { top: 8, right: 16, bottom: 8, left: 8 };
+const CHART_FONT =
+  "Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
+
+/** The single shared recharts theme. `theme` is the DataContext theme string. */
+function getChartTheme(theme) {
+  const dark = theme !== 'light';
+  return {
+    dark,
+    palette: CHART_PALETTE,
+    fontFamily: CHART_FONT,
+    tick: dark ? '#94a3b8' : '#64748b',
+    legendText: dark ? '#cbd5e1' : '#475569',
+    grid: dark ? '#1e293b' : '#e2e8f0',
+    axisLine: dark ? '#334155' : '#cbd5e1',
+    cursorFill: dark ? '#94a3b8' : '#64748b',
+    tickFontSize: 12,
+    smallTickFontSize: 11,
+    margin: { top: 8, right: 16, bottom: 8, left: 8 },
+  };
+}
+
+const seriesColor = (i) => CHART_PALETTE[i % CHART_PALETTE.length];
 
 function truncateLabel(value, max = 18) {
   const s = String(value);
@@ -58,8 +92,59 @@ function tickLabel(v) {
   return String(v);
 }
 
+/**
+ * Shared custom tooltip for every chart type. Colors come from the CSS
+ * variables defined in index.css (:root / .dark), which flip with the
+ * `dark` class DataContext toggles on <html> — so the tooltip always
+ * matches the active theme without JS color branching here.
+ *
+ * Axis labels are shown in full (never truncated), so long category names
+ * that get an ellipsis on the axis remain fully readable on hover.
+ */
+function ChartTooltip({ active, payload, label, scatter = false, seriesColors }) {
+  if (!active || !Array.isArray(payload) || payload.length === 0) return null;
+  const showTitle = !scatter && label !== undefined && label !== null && label !== '';
+  return (
+    <div className="dp-chart-tooltip">
+      {showTitle ? (
+        <div className="dp-chart-tooltip-title">{String(label)}</div>
+      ) : null}
+      <div className="dp-chart-tooltip-rows">
+        {payload.map((entry, i) => {
+          const dotColor =
+            (seriesColors && seriesColors[i]) ||
+            entry.color ||
+            entry.payload?.fill ||
+            entry.fill ||
+            seriesColor(i);
+          const name =
+            entry.name !== undefined && entry.name !== null && entry.name !== ''
+              ? String(entry.name)
+              : entry.dataKey !== undefined && entry.dataKey !== null
+                ? String(entry.dataKey)
+                : '';
+          const value = scatter
+            ? `x: ${tickLabel(entry.payload?.x)}, y: ${tickLabel(entry.payload?.y)}`
+            : tickLabel(entry.value);
+          return (
+            <div key={i} className="dp-chart-tooltip-row">
+              <span
+                className="dp-chart-tooltip-dot"
+                style={{ backgroundColor: dotColor }}
+                aria-hidden="true"
+              />
+              {name ? <span className="dp-chart-tooltip-name">{name}</span> : null}
+              <span className="dp-chart-tooltip-value">{value}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /** Custom SVG box plot (recharts has no box plot in v2). */
-function BoxPlotSVG({ data, height, tick, grid }) {
+function BoxPlotSVG({ data, height, theme }) {
   const W = 600;
   const padL = 52;
   const padR = 16;
@@ -84,7 +169,9 @@ function BoxPlotSVG({ data, height, tick, grid }) {
   const slot = (W - padL - padR) / clean.length;
   const boxW = Math.max(14, Math.min(56, slot * 0.45));
   const capW = boxW * 0.6;
-  const color = PALETTE[0];
+  const color = theme.palette[0];
+  const tickFill = theme.tick;
+  const labelStyle = { fontFamily: theme.fontFamily };
 
   return (
     <svg
@@ -99,8 +186,8 @@ function BoxPlotSVG({ data, height, tick, grid }) {
         const yy = y(v);
         return (
           <g key={f}>
-            <line x1={padL} x2={W - padR} y1={yy} y2={yy} stroke={grid} strokeDasharray="3 3" />
-            <text x={padL - 6} y={yy + 3.5} textAnchor="end" fontSize={10} fill={tick}>
+            <line x1={padL} x2={W - padR} y1={yy} y2={yy} stroke={theme.grid} strokeDasharray="3 3" />
+            <text x={padL - 6} y={yy + 3.5} textAnchor="end" fontSize={10} fill={tickFill} style={labelStyle}>
               {tickLabel(v)}
             </text>
           </g>
@@ -110,6 +197,7 @@ function BoxPlotSVG({ data, height, tick, grid }) {
         const cx = padL + slot * (i + 0.5);
         return (
           <g key={d.group}>
+            <title>{String(d.group)}</title>
             <line x1={cx} x2={cx} y1={y(d.min)} y2={y(d.max)} stroke={color} strokeWidth={1.5} />
             <line
               x1={cx - capW / 2}
@@ -145,15 +233,16 @@ function BoxPlotSVG({ data, height, tick, grid }) {
               stroke={color}
               strokeWidth={2}
             />
-            <text x={cx} y={y(d.median) - 6} textAnchor="middle" fontSize={10} fill={tick}>
+            <text x={cx} y={y(d.median) - 6} textAnchor="middle" fontSize={10} fill={tickFill} style={labelStyle}>
               {tickLabel(d.median)}
             </text>
             <text
               x={cx}
               y={height - padB + 20}
               textAnchor="middle"
-              fontSize={11}
-              fill={tick}
+              fontSize={theme.smallTickFontSize}
+              fill={tickFill}
+              style={labelStyle}
             >
               {truncateLabel(d.group, 16)}
             </text>
@@ -174,16 +263,57 @@ export default function ChartRenderer({ config, dataset, height = 300 }) {
     [dataset, config]
   );
 
-  const dark = theme !== 'light';
-  const tick = dark ? '#94a3b8' : '#64748b';
-  const grid = dark ? '#1e293b' : '#e2e8f0';
+  // Read-only: honor the OS reduced-motion preference by disabling recharts'
+  // JS-driven animations (CSS alone cannot stop them). Computed once.
+  const reduceMotion = useMemo(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return false;
+    }
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }, []);
+  const animationProps = reduceMotion ? { isAnimationActive: false } : {};
 
-  const tooltipStyle = {
-    backgroundColor: dark ? '#0f172a' : '#ffffff',
-    border: `1px solid ${grid}`,
-    borderRadius: 8,
-    color: dark ? '#e2e8f0' : '#0f172a',
-    fontSize: 12,
+  const t = getChartTheme(theme);
+
+  const axisTick = { fill: t.tick, fontSize: t.tickFontSize, fontFamily: t.fontFamily };
+  const smallAxisTick = {
+    fill: t.tick,
+    fontSize: t.smallTickFontSize,
+    fontFamily: t.fontFamily,
+  };
+
+  const legendProps = {
+    wrapperStyle: {
+      fontSize: t.tickFontSize,
+      lineHeight: '20px',
+      paddingTop: 6,
+      fontFamily: t.fontFamily,
+    },
+    formatter: (value) => (
+      <span style={{ color: t.legendText }}>{truncateLabel(value, 28)}</span>
+    ),
+    iconSize: 10,
+  };
+
+  const barCursor = { fill: t.cursorFill, fillOpacity: 0.15 };
+  const lineCursor = { stroke: t.grid };
+
+  // Shared axis prop bundles — one definition, used by every cartesian chart.
+  const categoryXAxis = {
+    dataKey: 'x',
+    tick: axisTick,
+    tickLine: false,
+    axisLine: { stroke: t.axisLine },
+    interval: 'preserveStart',
+    minTickGap: 24,
+    tickMargin: 8,
+    tickFormatter: (v) => truncateLabel(v),
+  };
+  const valueYAxis = {
+    tick: axisTick,
+    tickLine: false,
+    axisLine: false,
+    tickFormatter: compactNumber,
   };
 
   const placeholderStyle = {
@@ -192,12 +322,13 @@ export default function ChartRenderer({ config, dataset, height = 300 }) {
     alignItems: 'center',
     justifyContent: 'center',
     gap: 12,
-    border: `1px dashed ${grid}`,
+    border: `1px dashed ${t.grid}`,
     borderRadius: 12,
     padding: 24,
     textAlign: 'center',
-    color: tick,
+    color: t.tick,
     fontSize: 13,
+    fontFamily: t.fontFamily,
   };
 
   if (error) {
@@ -222,51 +353,37 @@ export default function ChartRenderer({ config, dataset, height = 300 }) {
   }
 
   const showLegend = seriesKeys.length > 1;
-  const axisTick = { fill: tick, fontSize: 12 };
+  const seriesColors = seriesKeys.map((_, i) => seriesColor(i));
 
   const renderChart = () => {
     switch (config && config.type) {
       case 'bar':
         return (
-          <BarChart data={data} margin={AXIS_MARGIN}>
-            <CartesianGrid stroke={grid} strokeDasharray="3 3" vertical={false} />
-            <XAxis
-              dataKey="x"
-              tick={axisTick}
-              tickLine={false}
-              axisLine={{ stroke: grid }}
-              interval="preserveStart"
-              tickFormatter={(v) => truncateLabel(v)}
+          <BarChart data={data} margin={t.margin}>
+            <CartesianGrid stroke={t.grid} strokeDasharray="3 3" vertical={false} />
+            <XAxis {...categoryXAxis} />
+            <YAxis {...valueYAxis} />
+            <Tooltip
+              content={<ChartTooltip seriesColors={seriesColors} />}
+              cursor={barCursor}
             />
-            <YAxis
-              tick={axisTick}
-              tickLine={false}
-              axisLine={false}
-              tickFormatter={compactNumber}
-            />
-            <Tooltip contentStyle={tooltipStyle} cursor={{ fill: grid, fillOpacity: 0.2 }} />
-            {showLegend && <Legend />}
+            {showLegend && <Legend {...legendProps} />}
             {seriesKeys.map((k, i) => (
               <Bar
                 key={k}
                 dataKey={k}
-                fill={PALETTE[i % PALETTE.length]}
+                fill={seriesColor(i)}
                 radius={[4, 4, 0, 0]}
+                {...animationProps}
               />
             ))}
           </BarChart>
         );
       case 'hbar':
         return (
-          <BarChart data={data} layout="vertical" margin={AXIS_MARGIN}>
-            <CartesianGrid stroke={grid} strokeDasharray="3 3" horizontal={false} />
-            <XAxis
-              type="number"
-              tick={axisTick}
-              tickLine={false}
-              axisLine={{ stroke: grid }}
-              tickFormatter={compactNumber}
-            />
+          <BarChart data={data} layout="vertical" margin={t.margin}>
+            <CartesianGrid stroke={t.grid} strokeDasharray="3 3" horizontal={false} />
+            <XAxis type="number" {...valueYAxis} axisLine={{ stroke: t.axisLine }} />
             <YAxis
               type="category"
               dataKey="x"
@@ -274,94 +391,84 @@ export default function ChartRenderer({ config, dataset, height = 300 }) {
               tick={axisTick}
               tickLine={false}
               axisLine={false}
+              tickMargin={8}
               tickFormatter={(v) => truncateLabel(v)}
             />
-            <Tooltip contentStyle={tooltipStyle} cursor={{ fill: grid, fillOpacity: 0.2 }} />
-            {showLegend && <Legend />}
+            <Tooltip
+              content={<ChartTooltip seriesColors={seriesColors} />}
+              cursor={barCursor}
+            />
+            {showLegend && <Legend {...legendProps} />}
             {seriesKeys.map((k, i) => (
               <Bar
                 key={k}
                 dataKey={k}
-                fill={PALETTE[i % PALETTE.length]}
+                fill={seriesColor(i)}
                 radius={[0, 4, 4, 0]}
+                {...animationProps}
               />
             ))}
           </BarChart>
         );
       case 'line':
         return (
-          <LineChart data={data} margin={AXIS_MARGIN}>
-            <CartesianGrid stroke={grid} strokeDasharray="3 3" vertical={false} />
-            <XAxis
-              dataKey="x"
-              tick={axisTick}
-              tickLine={false}
-              axisLine={{ stroke: grid }}
-              interval="preserveStart"
-              tickFormatter={(v) => truncateLabel(v)}
+          <LineChart data={data} margin={t.margin}>
+            <CartesianGrid stroke={t.grid} strokeDasharray="3 3" vertical={false} />
+            <XAxis {...categoryXAxis} />
+            <YAxis {...valueYAxis} />
+            <Tooltip
+              content={<ChartTooltip seriesColors={seriesColors} />}
+              cursor={lineCursor}
             />
-            <YAxis
-              tick={axisTick}
-              tickLine={false}
-              axisLine={false}
-              tickFormatter={compactNumber}
-            />
-            <Tooltip contentStyle={tooltipStyle} cursor={{ stroke: grid }} />
-            {showLegend && <Legend />}
+            {showLegend && <Legend {...legendProps} />}
             {seriesKeys.map((k, i) => (
               <Line
                 key={k}
                 type="monotone"
                 dataKey={k}
-                stroke={PALETTE[i % PALETTE.length]}
+                stroke={seriesColor(i)}
                 strokeWidth={2}
                 dot={false}
                 activeDot={{ r: 4 }}
+                {...animationProps}
               />
             ))}
           </LineChart>
         );
       case 'area':
         return (
-          <AreaChart data={data} margin={AXIS_MARGIN}>
-            <CartesianGrid stroke={grid} strokeDasharray="3 3" vertical={false} />
-            <XAxis
-              dataKey="x"
-              tick={axisTick}
-              tickLine={false}
-              axisLine={{ stroke: grid }}
-              interval="preserveStart"
-              tickFormatter={(v) => truncateLabel(v)}
+          <AreaChart data={data} margin={t.margin}>
+            <CartesianGrid stroke={t.grid} strokeDasharray="3 3" vertical={false} />
+            <XAxis {...categoryXAxis} />
+            <YAxis {...valueYAxis} />
+            <Tooltip
+              content={<ChartTooltip seriesColors={seriesColors} />}
+              cursor={lineCursor}
             />
-            <YAxis
-              tick={axisTick}
-              tickLine={false}
-              axisLine={false}
-              tickFormatter={compactNumber}
-            />
-            <Tooltip contentStyle={tooltipStyle} cursor={{ stroke: grid }} />
-            {showLegend && <Legend />}
+            {showLegend && <Legend {...legendProps} />}
             {seriesKeys.map((k, i) => (
               <Area
                 key={k}
                 type="monotone"
                 dataKey={k}
-                stroke={PALETTE[i % PALETTE.length]}
-                fill={PALETTE[i % PALETTE.length]}
+                stroke={seriesColor(i)}
+                fill={seriesColor(i)}
                 fillOpacity={0.25}
                 strokeWidth={2}
                 dot={false}
                 activeDot={{ r: 4 }}
+                {...animationProps}
               />
             ))}
           </AreaChart>
         );
       case 'pie':
-      case 'donut':
+      case 'donut': {
+        const sliceColors = data.map((_, i) => seriesColor(i));
         return (
           <PieChart>
-            <Tooltip contentStyle={tooltipStyle} />
-            <Legend />
+            <Tooltip content={<ChartTooltip seriesColors={sliceColors} />} />
+            <Legend {...legendProps} />
             <Pie
               data={data}
               dataKey="value"
@@ -369,25 +476,28 @@ export default function ChartRenderer({ config, dataset, height = 300 }) {
               innerRadius={config.type === 'donut' ? '45%' : 0}
               outerRadius="80%"
               paddingAngle={2}
+              {...animationProps}
             >
               {data.map((d, i) => (
-                <Cell key={i} fill={PALETTE[i % PALETTE.length]} />
+                <Cell key={i} fill={sliceColors[i]} />
               ))}
             </Pie>
           </PieChart>
         );
+      }
       case 'scatter': {
         const grouped = Boolean(config.groupKey) && seriesKeys.length > 1;
         return (
-          <ScatterChart margin={AXIS_MARGIN}>
-            <CartesianGrid stroke={grid} strokeDasharray="3 3" />
+          <ScatterChart margin={t.margin}>
+            <CartesianGrid stroke={t.grid} strokeDasharray="3 3" />
             <XAxis
               type="number"
               dataKey="x"
               name={config.xKey}
               tick={axisTick}
               tickLine={false}
-              axisLine={{ stroke: grid }}
+              axisLine={{ stroke: t.axisLine }}
+              tickMargin={8}
               tickFormatter={compactNumber}
             />
             <YAxis
@@ -399,22 +509,27 @@ export default function ChartRenderer({ config, dataset, height = 300 }) {
               axisLine={false}
               tickFormatter={compactNumber}
             />
-            <Tooltip contentStyle={tooltipStyle} cursor={{ stroke: grid }} />
-            {showLegend && <Legend />}
+            <Tooltip
+              content={<ChartTooltip scatter seriesColors={seriesColors} />}
+              cursor={lineCursor}
+            />
+            {showLegend && <Legend {...legendProps} />}
             {grouped
               ? seriesKeys.map((sk, i) => (
                   <Scatter
                     key={sk}
                     name={sk}
                     data={data.filter((p) => p.group === sk)}
-                    fill={PALETTE[i % PALETTE.length]}
+                    fill={seriesColor(i)}
+                    {...animationProps}
                   />
                 ))
               : (
                 <Scatter
                   name={config.yKey || 'values'}
                   data={data}
-                  fill={PALETTE[0]}
+                  fill={seriesColor(0)}
+                  {...animationProps}
                 />
               )}
           </ScatterChart>
@@ -422,14 +537,16 @@ export default function ChartRenderer({ config, dataset, height = 300 }) {
       }
       case 'histogram':
         return (
-          <BarChart data={data} margin={AXIS_MARGIN}>
-            <CartesianGrid stroke={grid} strokeDasharray="3 3" vertical={false} />
+          <BarChart data={data} margin={t.margin}>
+            <CartesianGrid stroke={t.grid} strokeDasharray="3 3" vertical={false} />
             <XAxis
               dataKey="label"
-              tick={{ fill: tick, fontSize: 11 }}
+              tick={smallAxisTick}
               tickLine={false}
-              axisLine={{ stroke: grid }}
+              axisLine={{ stroke: t.axisLine }}
               interval="preserveStart"
+              minTickGap={16}
+              tickMargin={8}
             />
             <YAxis
               tick={axisTick}
@@ -438,12 +555,15 @@ export default function ChartRenderer({ config, dataset, height = 300 }) {
               tickFormatter={compactNumber}
               allowDecimals={false}
             />
-            <Tooltip contentStyle={tooltipStyle} cursor={{ fill: grid, fillOpacity: 0.2 }} />
-            <Bar dataKey="count" fill={PALETTE[0]} radius={[4, 4, 0, 0]} />
+            <Tooltip
+              content={<ChartTooltip seriesColors={[seriesColor(0)]} />}
+              cursor={barCursor}
+            />
+            <Bar dataKey="count" fill={seriesColor(0)} radius={[4, 4, 0, 0]} {...animationProps} />
           </BarChart>
         );
       case 'box':
-        return <BoxPlotSVG data={data} height={height} tick={tick} grid={grid} />;
+        return <BoxPlotSVG data={data} height={height} theme={t} />;
       default:
         return null;
     }
